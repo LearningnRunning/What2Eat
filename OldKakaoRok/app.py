@@ -14,7 +14,7 @@ BannerImage = Image.open('KakaoRok.png')
 st.sidebar.header("KakaoRok")
 name = st.sidebar.selectbox("menu", ["Welcome", "kakaoRok"])
 
-
+# 주소를 넣으면 위도, 경도 생성
 def geocode(address):
     apiurl = "http://api.vworld.kr/req/address?"
     params = {
@@ -23,22 +23,11 @@ def geocode(address):
         "crs": "epsg:4326",
         "address": address,
         "format": "json",
-        "type": "parcel",
-        "key": st.secrets["geocodeKey"],
+        "type": "parcel", # parcel: 구주소, road: 도로면
+        "key": st.secrets["geocodeKey"], # ApiKey
     }
 
-# from auth import *
-# def geocode(address):
-#     apiurl = "http://api.vworld.kr/req/address?"
-#     params = {
-#         "service": "address",
-#         "request": "getcoord",
-#         "crs": "epsg:4326",
-#         "address": address,
-#         "format": "json",
-#         "type": "parcel",
-#         "key": geocodeKey_1
-#     }
+
     
     try:
         response = requests.get(apiurl, params=params)
@@ -48,13 +37,13 @@ def geocode(address):
         if json_data["response"]["status"] == "OK":
             x = json_data["response"]["result"]["point"]["x"]
             y = json_data["response"]["result"]["point"]["y"]
-            print(json_data["response"]["refined"]["text"])
-            print("\n경도: ", x, "\n위도: ", y)
+
             return x, y
     except Exception as e:
         print(e)
         pass
 
+# 지도에 Pop시 정보창 생성
 def popup_html(df,count, likepoint,menu, unlike):
     name=df['name']
     category1=df['cat1']
@@ -136,6 +125,7 @@ def popup_html(df,count, likepoint,menu, unlike):
 """
     return html
 
+# 카테고리 단일화를 위한 Dictionary
 cat = {
     "베이커리,카페": [
         "폴바셋",
@@ -192,6 +182,7 @@ cat = {
 # matki_DB 경로설정
 tmp_df = pd.read_csv("./matki_DB.csv")
 
+# 소개창
 if name == "Welcome":
     st.image(BannerImage)
     st.write("# Hello, KakaoRok World")
@@ -225,6 +216,7 @@ if name == "Welcome":
     #     '### 2. 크롤러_ 예를 들어 "부산 서면" 이라고 친다면 부산 서면 맛집 450개를 스크래핑하여 matki_DB 데이터에 추가됩니다! '
     # )
 
+# 기능창
 elif name == "kakaoRok":
 
     st.write("# 깐깐한 리뷰어들이 극찬한 음식점을 찾아줍니다. ")
@@ -260,19 +252,9 @@ elif name == "kakaoRok":
     hght = st.slider('화면 세로 크기', 500, 2048, 700)
 
 
-    
-        
-    # btn_clicked = st.button("Confirm", key="confirm_btn")
-
-    # if btn_clicked:
-    #     con = st.container()
-    #     con.caption("Result")
-    #     if not str(input_cat):
-    #         con.error("다시 입력해주세요.")
-    #     else:
-    #         con.write(region, input_cat)
 
     if bool(cat) and bool(region):
+        # 사용자 위도경도 생성
         x, y = geocode(region)
 
         RestaurantType = cat
@@ -284,13 +266,15 @@ elif name == "kakaoRok":
 
         result_lst = Counter(result_df["name"].to_list()).most_common()
 
+        # 지도시각화
         m = folium.Map(location=[y, x], zoom_start=15)
         marker_cluster = MarkerCluster().add_to(m)
         for result in result_lst:
             try:
                 personalAverageScoreRow = 3.2
                 thisRestaurantScore = 2.0
-                # print(result)
+                
+                # 불호 인원 수 
                 row_df = result_df[
                     (result_df["name"] == result[0])
                     & (result_df["rate"] >= personalAverageScoreRow)
@@ -299,7 +283,7 @@ elif name == "kakaoRok":
 
                 detail = result_df[result_df["name"] == result[0]].iloc[-1, :]
 
-                # print(detail)
+                # 키워드 문자열 정리
                 if type(detail["likePoint"]) != float:
                     likePoint = detail["likePoint"].split("@")
                     likePointCnt = detail["likePointCnt"].split("@")
@@ -313,6 +297,7 @@ elif name == "kakaoRok":
                 if len(row_df) >= 5:
                     color = 'gray'
                     unlike = "</br> 다만, 불호가 너무 많은 식당입니다. 불호 개수 : {}".format(len(row_df))
+
 
                 if result[1] >= people_counts:
     
@@ -334,7 +319,7 @@ elif name == "kakaoRok":
                     iframe = branca.element.IFrame(html=html,width=510,height=280)
                     popup = folium.Popup(folium.Html(html, script=True), max_width=500)
                     
-
+                    # 마커 생성
                     folium.Marker(
                         [detail["lat"], detail["lon"]],
                         popup=popup,
