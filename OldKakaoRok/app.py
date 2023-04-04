@@ -9,10 +9,17 @@ from streamlit_folium import folium_static, st_folium
 import branca
 from PIL import Image
 
-BannerImage = Image.open('KakaoRok.png')
+from streamlit_option_menu import option_menu
 
-st.sidebar.header("KakaoRok")
-name = st.sidebar.selectbox("menu", ["Welcome", "kakaoRok"])
+# style.css 적용
+with open('style.css', 'r') as f:
+    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+# BannerImage = Image.open('KakaoRok.png')
+
+with st.sidebar:
+    name = option_menu("KakaoRok", ["About", "Search"],
+                       menu_icon="app-indicator")
 
 # 주소를 넣으면 위도, 경도 생성
 def geocode(address):
@@ -24,7 +31,7 @@ def geocode(address):
         "address": address,
         "format": "json",
         "type": "parcel", # parcel: 구주소, road: 도로면
-        "key": st.secrets["geocodeKey"], # ApiKey
+        "key": "APIKEY"
     }
 
 
@@ -66,8 +73,8 @@ def popup_html(df,count, likepoint,menu, unlike):
     else:
         open_time = df["open_time"]        
         
-    left_col_color = "#19a7bd"
-    right_col_color = "#f2f0d3"
+    left_col_color = "#ff4b4b"
+    right_col_color = "#f0f2f6"
     
     html = """<!DOCTYPE html>
 <html>
@@ -77,46 +84,46 @@ def popup_html(df,count, likepoint,menu, unlike):
         <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/KakaoMap_logo.png" alt="Clickable image" width="20" style="float: left; margin-right: 10px;">
     </a>
     <p>
-        <h4 width="200px" >{0}</h4>""".format(name) + """
+        <h4 width="80%" >{0}</h4>""".format(name) + """
     </p>
 </div>
 
 
-<h5 style="margin-bottom:10"; width="200px">{0}명의 리뷰어가 4점 이상으로 평가하였습니다.{1}</h4>""".format(count, unlike) + """
+<h5 style="margin-bottom:10;"; width="80%">{0}명의 리뷰어가 4점 이상으로 평가하였습니다.{1}</h4>""".format(count, unlike) + """
 
 </head>
-    <table style="height: 126px; width: 350px;">
+    <table style="height: 126px; width: 90%; margin: 0 auto;">
 <tbody>
 
 
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">업종</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(category1) + """
+<td style="width:30%; text-align:center; background-color: """+ left_col_color +""";"><span style="color: #ffffff;">업종</span></td>
+<td style="text-align:center; width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(category1) + """
 </tr>
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">평균 평점</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(score_min) + """
+<td style="text-align:center; background-color: """+ left_col_color +""";"><span style="color: #ffffff;">평균 평점</span></td>
+<td style="text-align:center; width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(score_min) + """
 </tr>
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">평점수/ 블로그 리뷰수</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{0} 개/ {1}개</td>""".format(review_num, blog_review_num) + """
+<td style="text-align:center; background-color: """+ left_col_color +""";"><span style="color: #ffffff;">평점수/ 블로그 리뷰수</span></td>
+<td style="text-align:center; width: 150px;background-color: """+ right_col_color +""";">{0} 개/ {1}개</td>""".format(review_num, blog_review_num) + """
 </tr>
 
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">메뉴</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(menu) + """
+<td style="text-align:center; background-color: """+ left_col_color +""";"><span style="color: #ffffff;">메뉴</span></td>
+<td style="text-align:center; width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(menu) + """
 </tr>
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">요약</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(likepoint) + """
+<td style="text-align:center; background-color: """+ left_col_color +""";"><span style="color: #ffffff;">요약</span></td>
+<td style="text-align:center; width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(likepoint) + """
 </tr>
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">영업시간</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(open_time) + """
+<td style="text-align:center; background-color: """+ left_col_color +""";"><span style="color: #ffffff;">영업시간</span></td>
+<td style="text-align:center; width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(open_time) + """
 </tr>
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">주소</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(address) + """
+<td style="text-align:center; background-color: """+ left_col_color +""";"><span style="color: #ffffff;">주소</span></td>
+<td style="text-align:center; width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(address) + """
 </tr>
 
 </tbody>
@@ -183,48 +190,60 @@ cat = {
 tmp_df = pd.read_csv("./matki_DB.csv")
 
 # 소개창
-if name == "Welcome":
-    st.image(BannerImage)
+if name == "About":
+    # st.image(BannerImage)
     st.write("# Hello, KakaoRok World")
     st.write("보유 음식점 수: {0}개 깐깐한 평가 수: {1}개".format(
             len(set(tmp_df["name"].to_list())), len(tmp_df["name"].to_list())
         ))
     
+    st.markdown('---')
 
-    st.write("## 0. 서비스 설명")
+    st.write("## 서비스 설명")
     st.write(
         "1. 음식점 평균 평점이 3.0 이상\n2. 리뷰어 개인 평균 평점이 3.8 이하지만 해당 음식점에는 4.0 이상으로 평가한 리뷰어\n"
     )
     st.write(
-        "#### 1번 조건의 음식점 중에서 2번 조건의 리뷰어가 많은 음식점만이 지도에 표시됩니다. \n##### 단, 개인평균평점이 3.2 이상이지만 해당 음식점에 2.0 이하로 평가한 리뷰어가 3명을 초과한 음식점은 불호가 많은 음식점이라고 별도 표기해놓았습니다."
+        "##### 1번 조건의 음식점 중에서 2번 조건의 리뷰어가 많은 음식점만이 지도에 표시됩니다. \n##### 단, 개인평균평점이 3.2 이상이지만 해당 음식점에 2.0 이하로 평가한 리뷰어가 3명을 초과한 음식점은 불호가 많은 음식점이라고 별도 표기해놓았습니다."
     )
 
-    st.write("## 1. 사용방법")
+    st.markdown('---')
+
+    st.write("## 사용방법")
     st.write(
-        "0. 왼쪽 사이드에서 kakaoRok으로 갑니다. \n1. 음식 카테고리는 숫자로 입력하시면 됩니다. \n2. 지역 검색은 행정구역 단위로 검색하시면 됩니다. 예를 들어, 망원동/ 영등포구 등등.."
+        "0. 왼쪽 사이드바에서 Search를 선택합니다. \n1. 음식 카테고리는 숫자로 입력하시면 됩니다. \n2. 지역 검색은 행정구역 단위로 검색하시면 됩니다. 예를 들어, 망원동/ 영등포구 등등.."
     )
     columns = ["region"]
     tmp = pd.read_csv("./matki_DB.csv", usecols=columns)
     region_lst = list(dict.fromkeys(tmp["region"].to_list()))
-    st.write(
-        "## 2. 서비스 중인 지역 입니다. \n 2호선 위주로 차츰 늘려가겠습니다. 혹시 급하게 원하는 지역이 있다면 카톡 주세요.(ID: rockik)"
+
+    st.markdown('---')
+
+    col1, col2 = st.columns(2)
+    col1.write(
+        "## 서비스 중인 지역 입니다. \n 2호선 위주로 차츰 늘려가겠습니다. 혹시 급하게 원하는 지역이 있다면 카톡 주세요.(ID: rockik)"
     )
-    st.write(region_lst)
-    st.write("## 3. 카테고리 세부 목록입니다. 카테고리 선택시 참조하십시오.")
-    st.write(cat)
+    col1.write(region_lst)
+    col1.markdown('---')
+
+    col2.write("## 카테고리 세부 목록입니다. 카테고리 선택시 참조하십시오.")
+    col2.write(cat)
+    col2.markdown('---')
     # st.write(
     #     '### 2. 크롤러_ 예를 들어 "부산 서면" 이라고 친다면 부산 서면 맛집 450개를 스크래핑하여 matki_DB 데이터에 추가됩니다! '
     # )
 
 # 기능창
-elif name == "kakaoRok":
+elif name == "Search":
 
-    st.write("# 깐깐한 리뷰어들이 극찬한 음식점을 찾아줍니다. ")
+    st.write("""# 검색하기""")
 
-    st.write("## 카테고리를 골라보세요.")
+    st.write('깐깐한 리뷰어들이 극찬한 음식점을 찾아드립니다.')
+
+    st.write('---')
 
     cat = st.radio(
-    "",
+    "카테고리를 선택해주세요",
     (
     "베이커리,카페",
     "패스트푸드",
@@ -241,17 +260,21 @@ elif name == "kakaoRok":
     "찌개,국밥"
     ))
 
+    st.write('---')
+
     # input_cat = st.text_input("카테고리를 설정해주세요(번호) : ", value="11")
     region = st.text_input("검색할 지역을 입력해주세요(ex 영등포구 or 속초시)", value="서울특별시 중구")
     # size = st.radio(
     # "사이즈를 위해 사용 중인 디바이스 선택",
     # ('Phone', 'Web'))
+    
+    st.write('---')
     people_counts = st.slider('깐깐한 리뷰어 몇 명이상의 식당만 표시할까요?', 1, 50, 4)
     # hate_counts = st.slider('불호 리뷰어 해당 명이상의 식당은 별도 표기합니다', 1, 20, 3)
     wdt = st.slider('화면 가로 크기', 320, 1536, 400)
     hght = st.slider('화면 세로 크기', 500, 2048, 700)
 
-
+    st.write('---')
 
     if bool(cat) and bool(region):
         # 사용자 위도경도 생성
