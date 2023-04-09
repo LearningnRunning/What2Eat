@@ -191,7 +191,7 @@ if name == "Welcome":
     st.image(BannerImage)
     st.write("# Hello, KakaoRok World")
     st.write("보유 음식점 수: {0}개 깐깐한 평가 수: {1}개".format(
-            len(set(tmp_df["name"].to_list())), len(tmp_df["name"].to_list())
+            len(set(df_diner["name"].to_list())), len(df_diner["name"].to_list())
         ))
     
 
@@ -269,7 +269,7 @@ elif name == "kakaoRok":
         # ]
             # 쿼리문으로 대체
         result_df = df_diner.query(f'(diner_category == "{diner_category}") and (diner_lon != 0)  and (diner_lat != 0)')
-        result_df_inner_join = pd.merge(df_diner, df_review, left_index=True, right_on='diner_idx', how='inner')
+        result_df_inner_join = pd.merge(df_diner, df_review, left_index=True, right_on='diner_id', how='inner')
         st.write()
         st.write("# {}(음식점, 깐깐한 리뷰어 수)".format(diner_category))
         # X_Point
