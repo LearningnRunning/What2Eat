@@ -9,7 +9,6 @@ from streamlit_folium import folium_static, st_folium
 import branca
 from collections import Counter
 from PIL import Image
-from auth import *
 
 BannerImage = Image.open('./img_data/WhatToEat.png')
 
@@ -26,11 +25,9 @@ def geocode(address):
         "address": address,
         "format": "json",
         "type": "parcel", # parcel: 구주소, road: 도로면
-        "key": GEO_API_KEY # st.secrets["geocodeKey"], # ApiKey
+        "key": st.secrets["GEO_API_KEY"], # ApiKey
     }
 
-
-    
     try:
         response = requests.get(apiurl, params=params)
 
@@ -39,8 +36,8 @@ def geocode(address):
         if json_data["response"]["status"] == "OK":
             x = json_data["response"]["result"]["point"]["x"]
             y = json_data["response"]["result"]["point"]["y"]
-
-            return x, y
+            address_gu = json_data["response"]["refined"]["structure"]['level2']
+            return x, y, address_gu
     except Exception as e:
         print(e)
         pass
@@ -48,7 +45,7 @@ def geocode(address):
 # 지도에 Pop시 정보창 생성
 def popup_html(df,count, likepoint,menu, unlike):
     name=df['diner_name']
-    category1=df['diner_category']
+    category1=df['diner_category_large']
     address = df['diner_address'] 
     review_num=df['diner_review_cnt']
     if isinstance(review_num, (int,str)):
@@ -180,21 +177,111 @@ cat = {
     "면류": ["국수", "냉면", "일본식라면"],
     "샌드위치,샐러드": ["샐러디", "써브웨이", "샌드위치"],
 }
-# X_Point
-# matki_DB 경로설정
 
-# df_diner = pd.read_csv('./diner_only.csv')
-# df_review = pd.read_csv('./review_only.csv')
+@st.cache_data
+def main(result_df_inner_join, x, y):
+            ## 최적화
+            result_df_inner_join = result_df_inner_join.reset_index(drop=False)
+            result_lst = Counter(result_df_inner_join['diner_idx'].to_list())
 
 
-df_diner = pd.read_excel('./WhatToEat_DB.xlsx', sheet_name='diner', index_col=0)
-df_review = pd.read_excel('./WhatToEat_DB.xlsx', sheet_name='review', index_col=0)
+            # 지도시각화
+            m = folium.Map(location=[y, x], zoom_start=15)
+            marker_cluster = MarkerCluster().add_to(m)
+            for diner_idx, cnt in result_lst.items():
 
+                try:
+                    personalAverageScoreRow = 3.2
+                    thisRestaurantScore = 2.0
+
+                        ## 쿼리문 대체
+                    bad_reviews = result_df_inner_join.query(
+                                            f"(diner_idx == '{diner_idx}')" + 
+                                            f"and (diner_review_avg >= {personalAverageScoreRow})" + 
+                                            f"and (reviewer_review_score <= {thisRestaurantScore})"
+                                            )
+
+                    ## 쿼리문 대체
+                    detail = result_df_inner_join[result_df_inner_join['diner_idx'] == diner_idx].iloc[-1, :]
+            
+
+                        ## 정리
+                    if type(detail["diner_review_tags"]) is not float:
+                        # detail_set = detail.drop_duplicates(subset = 'diner_name', keep='last')
+                        diner_tags = detail["diner_review_tags"].replace('@', ' ')
+                    color = 'darkblue'
+                    unlike = ''
+                    if len(bad_reviews) >= 5:
+                        color = 'gray'
+                        unlike = "</br> 다만, 불호가 너무 많은 식당입니다. 불호 개수 : {}".format(len(bad_reviews))
+
+                    if cnt >= people_counts:
+
+                        if detail["diner_menu"] is not None:
+                            menu_tmp = detail["diner_menu"]
+                            if menu_tmp.find('['):
+                                menu_list = [" ".join(i.split("\n")[:2]) for i in menu_tmp.replace('[','').replace('[','').split(', ') if len(i)]
+                                menu = "\n".join(menu_list)
+                            elif menu_tmp.find('->'):
+                                menu_list =[" ".join(i.split("\n")[:2]) for i in menu_tmp.replace('가격:', '').split('->')]
+                                menu = "\n".join(menu_list)
+                            elif len(menu_tmp):
+                                menu = "".join(menu_tmp.replace('[','').replace('[','').split(', '))
+                            else:
+                                menu = "메뉴정보가 없는 음식점입니다."
+                        if len(menu) >= 120:
+                            menu = menu[:120] 
+                        html = popup_html(detail,cnt, diner_tags, menu, unlike)
+                        iframe = branca.element.IFrame(html=html,width=510,height=280)
+                        popup = folium.Popup(folium.Html(html, script=True), max_width=500)
+                        
+                        # 마커 생성
+                        folium.Marker(
+                            [detail["diner_lon"], detail["diner_lat"]],
+                            popup=popup,
+                            tooltip=name,
+                            icon=folium.Icon(color=color, icon="cloud", prefix='fa')
+                            ).add_to(marker_cluster)
+
+
+                except Exception as err:
+                    st.write(err)
+                    continue
+
+            st_data = folium_static(m, width=wdt, height=hght)
+
+@st.cache_data
+def makingquery(diner_category, address_gu):
+    personalAverageScoreRow = 3.8
+        
+    result_df = df_diner.query(f"(diner_category_large == '{diner_category}') and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow}) and (diner_address_gu == '{address_gu}')")
+    result_df_inner_join = pd.merge(df_review, result_df, on='diner_idx', how='inner')
+
+    thisRestaurantScore = 4.0
+    
+    result_df_inner_join = result_df_inner_join.query(f"reviewer_review_score >= {thisRestaurantScore}")
+
+    return result_df_inner_join
+
+def findGu(address_str):
+    default_ans = "마포구"
+    if type(address_str) == str:
+        gu_str = address_str.split(' ')[1]
+        if gu_str[-1] == '구':
+            return gu_str
+        else:
+            return default_ans
+    else:
+        return default_ans
+
+df_diner = pd.read_excel('./WhatToEat_DB_test.xlsx', sheet_name='diner', index_col=0)
+df_review = pd.read_excel('./WhatToEat_DB_test.xlsx', sheet_name='review', index_col=0)
+df_diner['diner_address_gu'] = df_diner['diner_address'].apply(findGu)
 
 # 소개창
 if name == "Welcome":
     st.image(BannerImage)
-    st.write("# Hello, KakaoRok World")
+    st.write("# Hello, What2Eat World")
     st.write("보유 음식점 수: {0}개 깐깐한 평가 수: {1}개".format(
             len(set(df_diner["diner_name"].to_list())), len(df_diner["diner_name"].to_list())
         ))
@@ -234,7 +321,7 @@ elif name == "kakaoRok":
     set(df_diner['diner_category_large'].to_list()))
 
     # input_cat = st.text_input("카테고리를 설정해주세요(번호) : ", value="11")
-    region = st.text_input("검색할 지역을 입력해주세요(ex 영등포구 or 속초시)", value="서울특별시 중구")
+    region = st.text_input("검색할 지역을 입력해주세요(ex 영등포구 or 속초시)", value="서울특별시 마포구 합정동")
     # size = st.radio(
     # "사이즈를 위해 사용 중인 디바이스 선택",
     # ('Phone', 'Web'))
@@ -247,156 +334,12 @@ elif name == "kakaoRok":
 
     if bool(diner_category) and bool(region):
         # 사용자 위도경도 생성
-        x, y = geocode(region)
-        # X_Point
-        # RestaurantType = diner_category
-            ## 위 코드는 단순히 변수를 변수에 담아서 중복된다고 생각하여 삭제
-        # X_Point
-        # result_df = tmp_df[
-        #     (tmp_df["cat1"] == RestaurantType) & (tmp_df["lon"].notnull()) & (tmp_df["lat"].notnull())
-        # ]
-            # 쿼리문으로 대체
-        personalAverageScoreRow = 3.8
-        
-        result_df = df_diner.query(f"(diner_category_large == '{diner_category}') and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow})")
-        st.dataframe(df_diner)
-  
-        
-        # print("result_df['diner_id'] 교집합 df_review['diner_id']:", set(result_df['diner_id'].to_list()) & set(df_review['diner_id'].to_list()))
-        result_df_inner_join = pd.merge(result_df, df_review)
-        thisRestaurantScore = 4.0
-        result_df_inner_join = result_df_inner_join.query(f"reviewer_review_score >= {thisRestaurantScore}")
-        # result_df_inner_join = pd.concat([df_review, result_df])
+        x, y, address_gu = geocode(region)
 
-        st.dataframe(result_df_inner_join)
+        
+        result_df_inner_join = makingquery(diner_category, address_gu)
         st.write()
         st.write("# {}(음식점, 깐깐한 리뷰어 수)".format(diner_category))
-        # X_Point
-        # result_lst = Counter(result_df["name"].to_list()).most_common()
-            ## 최적화
-        result_lst = Counter(result_df_inner_join['diner_id'].to_list())
 
-        # print("result_lst", result_lst)
-        # 지도시각화
-        m = folium.Map(location=[y, x], zoom_start=15)
-        marker_cluster = MarkerCluster().add_to(m)
-        for diner_id, cnt in result_lst.items():
-            # print(diner_id)
-            # print(result[1])
-            try:
-                personalAverageScoreRow = 3.2
-                thisRestaurantScore = 2.0
-                # X_Point
-                # 불호 인원 수 
-                # row_df = result_df[
-                #     (result_df["name"] == result[0])
-                #     & (result_df["rate"] >= personalAverageScoreRow)
-                #     & (result_df["reviewAt"] <= thisRestaurantScore)
-                # ]
-                    ## 쿼리문 대체
-                bad_reviews = result_df_inner_join.query(
-                                         f"(diner_id == '{diner_id}')" + 
-                                         f"and (diner_review_avg >= {personalAverageScoreRow})" + 
-                                         f"and (reviewer_review_score <= {thisRestaurantScore})"
-                                         )
-
-                # X_Point
-                # 키워드 문자열 정리
-                '''
-                if type(detail["diner_review_tags"]) != float:
-                    likePoint = detail["diner_review_tags"].split("@")
-                    likePointCnt = detail["diner_review_tags"].split("@")
-                    likePointList = []
-                    for l, c in zip(likePoint, likePointCnt):
-                        tmp = l + ": " + c
-                        likePointList.append(tmp)
-                        likePoint_tmp = " ".join(likePointList)
-                color = 'darkblue'
-                unlike = ''
-                if len(bad_reviews) >= 5:
-                    color = 'gray'
-                    unlike = "</br> 다만, 불호가 너무 많은 식당입니다. 불호 개수 : {}".format(len(bad_reviews))
-                '''
-                # X_Point
-                # detail = result_df[result_df["name"] == result[0]].iloc[-1, :]
-                ## 쿼리문 대체
-                detail = result_df_inner_join[result_df_inner_join['diner_id'] == diner_id].iloc[-1, :]
-                # print(detail)
-
-                    ## 정리
-                if type(detail["diner_review_tags"]) is not float:
-                    # detail_set = detail.drop_duplicates(subset = 'diner_name', keep='last')
-                    diner_tags = detail["diner_review_tags"].replace('@', ' ')
-                color = 'darkblue'
-                unlike = ''
-                if len(bad_reviews) >= 5:
-                    color = 'gray'
-                    unlike = "</br> 다만, 불호가 너무 많은 식당입니다. 불호 개수 : {}".format(len(bad_reviews))
-
-                if cnt >= people_counts:
-                    # X_Point
-                    '''
-                    if type(detail["cat2"]) != float:
-                        menu_tmp = detail["cat2"]
-                        if menu_tmp.find('['):
-                            menu_list = [" ".join(i.split("\n")[:2]) for i in menu_tmp.replace('[','').replace('[','').split(', ') if len(i)]
-                            menu = "\n".join(menu_list)
-                        elif menu_tmp.find('->'):
-                            menu_list =[" ".join(i.split("\n")[:2]) for i in menu_tmp.replace('가격:', '').split('->')]
-                            menu = "\n".join(menu_list)
-                        elif len(menu_tmp):
-                            menu = "".join(menu_tmp.replace('[','').replace('[','').split(', '))
-                        else:
-                            menu = "메뉴정보가 없는 음식점입니다." 
-                    if len(menu) >= 120:
-                        menu = menu[:120] 
-                    html = popup_html(detail,result[1], likePoint_tmp, menu, unlike)
-                    '''
-                        ## cat2 -> diner_menu / likePoint -> diner_tags
-                    '''
-                    if detail["diner_menu"] is not None:
-                        menu_tmp = detail["diner_menu"]
-                        if menu_tmp.find('['):
-                            menu_list = [" ".join(i.split("\n")[:2]) for i in menu_tmp.replace('[','').replace('[','').split(', ') if len(i)]
-                            menu = "\n".join(menu_list)
-                        elif menu_tmp.find('->'):
-                            menu_list =[" ".join(i.split("\n")[:2]) for i in menu_tmp.replace('가격:', '').split('->')]
-                            menu = "\n".join(menu_list)
-                        elif len(menu_tmp):
-                            menu = "".join(menu_tmp.replace('[','').replace('[','').split(', '))
-                        else:
-                            menu = "메뉴정보가 없는 음식점입니다."
-                    '''
-                        ## 
-                    if detail["diner_menu"] is not None:
-                        menu_tmp = detail["diner_menu"]
-                        if menu_tmp.find('['):
-                            menu_list = [" ".join(i.split("\n")[:2]) for i in menu_tmp.replace('[','').replace('[','').split(', ') if len(i)]
-                            menu = "\n".join(menu_list)
-                        elif menu_tmp.find('->'):
-                            menu_list =[" ".join(i.split("\n")[:2]) for i in menu_tmp.replace('가격:', '').split('->')]
-                            menu = "\n".join(menu_list)
-                        elif len(menu_tmp):
-                            menu = "".join(menu_tmp.replace('[','').replace('[','').split(', '))
-                        else:
-                            menu = "메뉴정보가 없는 음식점입니다."
-                    if len(menu) >= 120:
-                        menu = menu[:120] 
-                    html = popup_html(detail,cnt, diner_tags, menu, unlike)
-                    iframe = branca.element.IFrame(html=html,width=510,height=280)
-                    popup = folium.Popup(folium.Html(html, script=True), max_width=500)
-                    
-                    # 마커 생성
-                    folium.Marker(
-                        [detail["diner_lat"], detail["diner_lon"]],
-                        popup=popup,
-                        tooltip=name,
-                        icon=folium.Icon(color=color, icon="cloud", prefix='fa')
-                        ).add_to(marker_cluster)
-
-
-            except Exception as err:
-                st.write(err)
-                continue
-
-        st_data = folium_static(m, width=wdt, height=hght)
+        main(result_df_inner_join, x, y)
+        
