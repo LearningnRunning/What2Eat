@@ -178,7 +178,7 @@ cat = {
     "샌드위치,샐러드": ["샐러디", "써브웨이", "샌드위치"],
 }
 
-@st.cache_data
+@st.cache
 def main(result_df_inner_join, x, y):
             ## 최적화
             result_df_inner_join = result_df_inner_join.reset_index(drop=False)
@@ -250,7 +250,7 @@ def main(result_df_inner_join, x, y):
 
             st_data = folium_static(m, width=wdt, height=hght)
 
-@st.cache_data
+@st.cache
 def makingquery(diner_category, address_gu):
     personalAverageScoreRow = 3.8
         
