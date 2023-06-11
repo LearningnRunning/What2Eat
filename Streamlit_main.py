@@ -274,8 +274,8 @@ def findGu(address_str):
     else:
         return default_ans
 
-df_diner = pd.read_excel('./WhatToEat_DB_test.xlsx', sheet_name='diner', index_col=0)
-df_review = pd.read_excel('./WhatToEat_DB_test.xlsx', sheet_name='review', index_col=0)
+df_diner = pd.read_excel('./whatToEat_DB_test.xlsx', sheet_name='diner', index_col=0)
+df_review = pd.read_excel('./whatToEat_DB_test.xlsx', sheet_name='review', index_col=0)
 df_diner['diner_address_gu'] = df_diner['diner_address'].apply(findGu)
 
 # 소개창
