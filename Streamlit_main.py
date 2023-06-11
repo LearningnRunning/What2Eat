@@ -7,6 +7,7 @@ import streamlit as st
 from folium.plugins import MarkerCluster
 from streamlit_folium import folium_static, st_folium
 import branca
+from geopy.geocoders import Nominatim
 from collections import Counter
 from PIL import Image
 
@@ -17,33 +18,16 @@ name = st.sidebar.selectbox("menu", ["Welcome", "kakaoRok"])
 
 # 주소를 넣으면 위도, 경도 생성
 def geocode(address):
-    apiurl = "http://api.vworld.kr/req/address?"
-    params = {
-        "service": "address",
-        "request": "getcoord",
-        "crs": "epsg:4326",
-        "address": address,
-        "format": "json",
-        "type": "parcel", # parcel: 구주소, road: 도로면
-        "key": st.secrets["GEO_API_KEY"], # ApiKey
-    }
-    x, y = 126.962101108891, 37.5512831039192
-    try:
-        response = requests.get(apiurl, params=params)
-
-        json_data = response.json()
-
-        if json_data["response"]["status"] == "OK":
-            x = json_data["response"]["result"]["point"]["x"]
-            y = json_data["response"]["result"]["point"]["y"]
-            address_gu = json_data["response"]["refined"]["structure"]['level2']
-            print(x, y)
-            return x, y, address_gu
-        else:
-            return x, y, address_gu
-    except Exception as e:
-        print(e)
-        pass
+    longitude, latitude = 126.962101108891, 37.5512831039192
+    address_gu = "마포구"
+    geolocator = Nominatim(user_agent="What2Eat")
+    location = geolocator.geocode(address)
+    if location:
+        latitude = location.latitude
+        longitude = location.longitude
+        return longitude, latitude, address_gu
+    else:
+        return longitude, latitude, address_gu
 
 # 지도에 Pop시 정보창 생성
 def popup_html(df,count, likepoint,menu, unlike):
