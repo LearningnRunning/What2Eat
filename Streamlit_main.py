@@ -27,7 +27,7 @@ def geocode(address):
         "type": "parcel", # parcel: 구주소, road: 도로면
         "key": st.secrets["GEO_API_KEY"], # ApiKey
     }
-
+    x, y = 126.962101108891, 37.5512831039192
     try:
         response = requests.get(apiurl, params=params)
 
@@ -40,7 +40,7 @@ def geocode(address):
             print(x, y)
             return x, y, address_gu
         else:
-            return 126.962101108891, 37.5512831039192, address_gu
+            return x, y, address_gu
     except Exception as e:
         print(e)
         pass
