@@ -23,8 +23,13 @@ def geocode(address):
     geolocator = Nominatim(user_agent="What2Eat")
     location = geolocator.geocode(address)
     if location:
+        address_gu = location.address.split(", ")[1]
+        print(address_gu)
+        if address_gu[-1] != "구":
+            address_gu = "마포구"
         latitude = location.latitude
         longitude = location.longitude
+        
         return longitude, latitude, address_gu
     else:
         return longitude, latitude, address_gu
@@ -219,7 +224,7 @@ def main(result_df_inner_join, x, y):
                         if len(menu) >= 120:
                             menu = menu[:120] 
                         html = popup_html(detail,cnt, diner_tags, menu, unlike)
-                        iframe = branca.element.IFrame(html=html,width=510,height=280)
+                        # iframe = branca.element.IFrame(html=html,width=510,height=280)
                         popup = folium.Popup(folium.Html(html, script=True), max_width=500)
                         
                         # 마커 생성
