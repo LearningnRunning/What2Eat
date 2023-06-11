@@ -37,7 +37,10 @@ def geocode(address):
             x = json_data["response"]["result"]["point"]["x"]
             y = json_data["response"]["result"]["point"]["y"]
             address_gu = json_data["response"]["refined"]["structure"]['level2']
+            print(x, y)
             return x, y, address_gu
+        else:
+            return 126.962101108891, 37.5512831039192, address_gu
     except Exception as e:
         print(e)
         pass
