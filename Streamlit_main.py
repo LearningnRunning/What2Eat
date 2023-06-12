@@ -7,6 +7,7 @@ import streamlit as st
 from folium.plugins import MarkerCluster
 from streamlit_folium import folium_static, st_folium
 import branca
+import math
 from geopy.geocoders import Nominatim
 from collections import Counter
 from PIL import Image
@@ -170,11 +171,13 @@ cat = {
     "샌드위치,샐러드": ["샐러디", "써브웨이", "샌드위치"],
 }
 
-@st.cache
+
 def main(result_df_inner_join, x, y):
             ## 최적화
             result_df_inner_join = result_df_inner_join.reset_index(drop=False)
-            result_lst = Counter(result_df_inner_join['diner_idx'].to_list())
+            result_list_inner_join = result_df_inner_join['diner_idx'].to_list()
+            result_list_inner_join = [result for result in result_list_inner_join if not math.isnan(result)]
+            result_lst = Counter()
 
 
             # 지도시각화
@@ -237,7 +240,7 @@ def main(result_df_inner_join, x, y):
 
 
                 except Exception as err:
-                    st.write(err)
+                    # st.write(err)
                     continue
 
             st_data = folium_static(m, width=wdt, height=hght)
