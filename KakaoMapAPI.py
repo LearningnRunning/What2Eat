@@ -6,7 +6,7 @@ import os
 import re
 from time import sleep
 import requests
-
+from tqdm import tqdm
 import pandas as pd
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -29,7 +29,7 @@ options.add_argument("disable-gpu")
 
 
 
-def KakaoMapAPI(regions):
+def kakaoMapAPI(regions):
     # Create an empty DataFrame to store all the restaurant information
     all_df = pd.DataFrame()
     
@@ -70,16 +70,16 @@ def KakaoMapAPI(regions):
         'place_name' : 'diner_name',
         'category_name' : 'diner_category',
         'phone' : 'diner_phone',
-        'id' : 'diner_id'
+        'id' : 'diner_idx'
     })
     all_df.drop_duplicates(subset=['place_url'], keep='last',inplace=True)
     # Return the final DataFrame with all the restaurant information
     return all_df
 
-def KakaoMapCreawler(urls_df):
+def kakaoMapCreawler(urls_df):
     driver = webdriver.Chrome(executable_path=ChromeDriverManager().install(), options=options)
     diner_cols = [
-        'diner_id',
+        'diner_idx',
         'diner_name',           # 가게이름 
         'diner_category',       # 가게 카테고리
         'diner_menu',           # 가게 메뉴
@@ -95,7 +95,7 @@ def KakaoMapCreawler(urls_df):
        ]
 
     review_cols = [
-            'diner_id',
+            'diner_idx',
             'reviewer_review',
             'reviewer_avg',         # 리뷰어의 평점 평균
             'reviewer_review_cnt',  # 리뷰어의 리뷰 개수
@@ -104,10 +104,10 @@ def KakaoMapCreawler(urls_df):
             'reviewer_id'
             ]
     # 사업장명, 주소, 음식종류1,음식종류2(메뉴),리뷰수,별점,리뷰
-    dinner_df = pd.read_excel('./diner_only.xlsx', sheet_name='diner', index_col = 0)
-    review_df = pd.read_excel('./diner_only.xlsx', sheet_name='review', index_col = 0)
+    dinner_df = pd.read_excel('./whatToEat_DB_test.xlsx', sheet_name='diner', index_col = 0)
+    review_df = pd.read_excel('./whatToEat_DB_test.xlsx', sheet_name='review', index_col = 0)
 
-    for i in range(len(urls_df)):
+    for i in tqdm(range(len(urls_df))):
         dinner_id = urls_df.iloc[i,5]
         page_url = urls_df.iloc[i,8]
         cat1 = urls_df.iloc[i,3]
@@ -116,7 +116,7 @@ def KakaoMapCreawler(urls_df):
         diner_phone = urls_df.iloc[i,6]
         diner_lat = urls_df.iloc[i,10]
         diner_lon = urls_df.iloc[i,11]
-        print(f"{dinner_id}: {page_url}")
+        # print(f"{dinner_id}: {page_url}")
         # 상세보기 페이지에 접속합니다
         driver.get(page_url)
         wait = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, 'kakaoWrap')))
@@ -244,7 +244,7 @@ def KakaoMapCreawler(urls_df):
     review_df.drop_duplicates(subset=['reviewer_id','reviewer_review','reviewer_review_cnt','reviewer_review_score','reviewer_review_date'], keep='last',inplace=True)
 
     # create an Excel writer object
-    writer = pd.ExcelWriter('./diner_only.xlsx', engine='xlsxwriter')
+    writer = pd.ExcelWriter('./whatToEat_DB_test.xlsx', engine='xlsxwriter')
 
     # write each dataframe to a separate sheet in the Excel file
     dinner_df.to_excel(writer, sheet_name='dinner', index=False)
