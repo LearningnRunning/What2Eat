@@ -246,10 +246,10 @@ def main(result_df_inner_join, x, y):
             st_data = folium_static(m, width=wdt, height=hght)
 
 @st.cache
-def makingquery(diner_category, address_gu):
+def makingquery(diner_category, address_gu, df_diner):
     personalAverageScoreRow = 3.8
         
-    result_df = df_diner.query(f"(diner_category_large == '{diner_category}') and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow}) and (diner_address_gu == '{address_gu}')")
+    result_df = df_diner.query(f"(diner_category_middle == '{diner_category}') and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow}) and (diner_address_gu == '{address_gu}')")
     result_df_inner_join = pd.merge(df_review, result_df, on='diner_idx', how='inner')
 
     thisRestaurantScore = 4.0
@@ -269,8 +269,8 @@ def findGu(address_str):
     else:
         return default_ans
 
-df_diner = pd.read_excel('./whatToEat_DB_test.xlsx', sheet_name='diner', index_col=0)
-df_review = pd.read_excel('./whatToEat_DB_test.xlsx', sheet_name='review', index_col=0)
+df_diner = pd.read_excel('./matki_DB.xlsx', sheet_name='diner', index_col=0)
+df_review = pd.read_excel('./matki_DB.xlsx', sheet_name='review', index_col=0)
 df_diner['diner_address_gu'] = df_diner['diner_address'].apply(findGu)
 
 # 소개창
@@ -313,7 +313,7 @@ elif name == "kakaoRok":
     # X_Point
     diner_category = st.radio(
     "",
-    set(df_diner['diner_category_large'].to_list()))
+    set(df_diner['diner_category_middle'].to_list()))
 
     # input_cat = st.text_input("카테고리를 설정해주세요(번호) : ", value="11")
     region = st.text_input("검색할 지역을 입력해주세요(ex 영등포구 or 속초시)", value="서울특별시 마포구 합정동")
@@ -332,7 +332,7 @@ elif name == "kakaoRok":
         x, y, address_gu = geocode(region)
 
         
-        result_df_inner_join = makingquery(diner_category, address_gu)
+        result_df_inner_join = makingquery(diner_category, address_gu, df_diner)
         st.write()
         st.write("# {}(음식점, 깐깐한 리뷰어 수)".format(diner_category))
 
