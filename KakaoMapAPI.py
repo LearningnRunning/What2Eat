@@ -23,18 +23,21 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 options = webdriver.ChromeOptions()
 options.add_argument("lang=ko_KR")
-options.add_argument("headless")
+# options.add_argument("headless")
 options.add_argument("window-size=1920x1080")
+options.add_argument("--start-maximized")
 options.add_argument("disable-gpu")
+# options.binary_location= 'chromedriver'
+driver = webdriver.Chrome(executable_path=ChromeDriverManager().install(), options=options)
 
-
+def toGetText(lst): return [l.get_attribute('innerText') for l in lst]
 
 def kakaoMapAPI(regions):
     # Create an empty DataFrame to store all the restaurant information
     all_df = pd.DataFrame()
     
     # Iterate over each region and search for restaurants using the Kakao Map API
-    for region in regions:
+    for region in tqdm(regions):
         # Set the API endpoint URL
         url = "https://dapi.kakao.com/v2/local/search/keyword.json"
         
@@ -77,7 +80,7 @@ def kakaoMapAPI(regions):
     return all_df
 
 def kakaoMapCreawler(urls_df):
-    driver = webdriver.Chrome(executable_path=ChromeDriverManager().install(), options=options)
+    
     diner_cols = [
         'diner_idx',
         'diner_name',           # 가게이름 
@@ -95,7 +98,7 @@ def kakaoMapCreawler(urls_df):
        ]
 
     review_cols = [
-            'diner_idx',
+            # 'diner_idx',
             'reviewer_review',
             'reviewer_avg',         # 리뷰어의 평점 평균
             'reviewer_review_cnt',  # 리뷰어의 리뷰 개수
@@ -103,9 +106,11 @@ def kakaoMapCreawler(urls_df):
             'reviewer_review_date', # 리뷰를 남긴 날짜
             'reviewer_id'
             ]
-    # 사업장명, 주소, 음식종류1,음식종류2(메뉴),리뷰수,별점,리뷰
-    dinner_df = pd.read_excel('./whatToEat_DB_test.xlsx', sheet_name='diner', index_col = 0)
-    review_df = pd.read_excel('./whatToEat_DB_test.xlsx', sheet_name='review', index_col = 0)
+    # # 사업장명, 주소, 음식종류1,음식종류2(메뉴),리뷰수,별점,리뷰
+    # diner_df = pd.read_excel('./whatToEat_DB_test.xlsx', sheet_name='diner', index_col = 0)
+    # review_df = pd.read_excel('./whatToEat_DB_test.xlsx', sheet_name='review', index_col = 0)
+    diner_df = pd.DataFrame()
+    review_df = pd.DataFrame()
 
     for i in tqdm(range(len(urls_df))):
         dinner_id = urls_df.iloc[i,5]
@@ -116,7 +121,7 @@ def kakaoMapCreawler(urls_df):
         diner_phone = urls_df.iloc[i,6]
         diner_lat = urls_df.iloc[i,10]
         diner_lon = urls_df.iloc[i,11]
-        # print(f"{dinner_id}: {page_url}")
+        print(f"{dinner_id}: {page_url}")
         # 상세보기 페이지에 접속합니다
         driver.get(page_url)
         wait = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, 'kakaoWrap')))
@@ -182,12 +187,10 @@ def kakaoMapCreawler(urls_df):
                     pass
 
         try:
-            html = driver.page_source
-            soup = BeautifulSoup(html, "html.parser")
-            contents_div = soup.find(name="div", attrs={"class": "evaluation_review"})
 
             # 별점을 가져옵니다.
-            rateNcnt = contents_div.find_all(name="span", attrs={"class": "txt_desc"})
+            rateNcnt = driver.find_elements(By.XPATH, '//span[@class="txt_desc"]')
+            rateNcnt = toGetText(rateNcnt)
             rateCnts = rateNcnt[::2]
             rates = rateNcnt[1::2]
 
@@ -195,17 +198,21 @@ def kakaoMapCreawler(urls_df):
             rateAts = driver.find_elements(
                 By.XPATH, '//div[@class="grade_star size_s"]/span/span'
             )
+            rateAts = [int(rateAt.get_attribute("style")[7:-2]) / 20 for rateAt in rateAts]
 
             # 리뷰를 가져옵니다.
-            reviews = contents_div.find_all(name="p", attrs={"class": "txt_comment"})
+            reviews = driver.find_elements(By.XPATH, '//div[@class="comment_info"]/p')
+            print("reviews_len: ", len(reviews))
+            reviews = toGetText(reviews)
 
             # 리뷰를 쓴 날짜를 가져옵니다.
-            reviews_dates = contents_div.find_all(
-                name="span", attrs={"class": "time_write"}
-            )
+            reviews_dates = driver.find_elements(By.XPATH, '//span[@class="time_write"]')
+            reviews_dates = toGetText(reviews_dates)
 
             # 리뷰 아이디 가져오기
-            reviews_ids = contents_div.find_all(name="a", attrs={"class": "link_user"})
+            reviews_ids = driver.find_elements(By.XPATH, '//a[@class="link_user"]')
+            reviews_ids = toGetText(reviews_ids)
+
             print("rateAts", len(rateAts), "reviews", len(reviews))
 
             dinner_row = [
@@ -224,29 +231,38 @@ def kakaoMapCreawler(urls_df):
                     open_time,
                 ]
             series = pd.DataFrame([dinner_row], columns=diner_cols)
-            dinner_df = pd.concat([dinner_df, series])
+            diner_df = pd.concat([diner_df, series])
             
-            rateAts = [int(rateAt.get_attribute("style")[7:-2]) / 20 for rateAt in rateAts]
+            
+            review_data_len = min([len(reviews), len(rateAts), len(rates), len(rateCnts), len(reviews_dates), len(reviews_ids)])
             # Create a dictionary with the data
             review_data = {
-                    'dinner_id': dinner_id,
-                    'reviewer_review': reviews,
-                    'reviewer_avg': rates,
-                    'reviewer_review_cnt': rateCnts,
-                    'reviewer_review_score': rateAts,
-                    'reviewer_review_date': reviews_dates,
-                    'reviewer_id': reviews_ids,
-                    }
-            review_df_tmp = pd.DataFrame([review_data], columns=review_cols)
+                        # 'diner_idx': [dinner_id,
+                        'reviewer_review': reviews[:review_data_len],
+                        'reviewer_avg': rates,
+                        'reviewer_review_cnt': rateCnts,
+                        'reviewer_review_score': rateAts[:review_data_len],
+                        'reviewer_review_date': reviews_dates,
+                        'reviewer_id': reviews_ids,
+                        }
+            review_data['diner_idx'] = dinner_id
+            print(len(reviews), len(rateAts), len(rates), len(rateCnts), len(reviews_dates), len(reviews_ids))
+            review_df_tmp = pd.DataFrame(review_data, columns=review_cols)
+
             review_df = pd.concat([review_df, review_df_tmp])
+            
         except Exception as e:
             print("예외가 발생되었습니다.", e)
-    review_df.drop_duplicates(subset=['reviewer_id','reviewer_review','reviewer_review_cnt','reviewer_review_score','reviewer_review_date'], keep='last',inplace=True)
+            continue
+        
+    review_df.to_csv('review_df.csv', index=False, encoding='utf-8-sig')
+    diner_df.to_csv('diner_df.csv', index=False, encoding='utf-8-sig')
+    review_df.drop_duplicates(subset=['diner_idx','reviewer_review','reviewer_review_date'], keep='last',inplace=True)
 
     # create an Excel writer object
     writer = pd.ExcelWriter('./whatToEat_DB_test.xlsx', engine='xlsxwriter')
 
     # write each dataframe to a separate sheet in the Excel file
-    dinner_df.to_excel(writer, sheet_name='dinner', index=False)
+    diner_df.to_excel(writer, sheet_name='dinner', index=False)
     review_df.to_excel(writer, sheet_name='review', index=False)
-    return dinner_df, review_df
+    return diner_df, review_df
