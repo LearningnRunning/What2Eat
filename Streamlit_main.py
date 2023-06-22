@@ -15,25 +15,44 @@ from PIL import Image
 BannerImage = Image.open('./img_data/WhatToEat.png')
 
 st.sidebar.header("KakaoRok")
-name = st.sidebar.selectbox("menu", ["Welcome", "kakaoRok"])
+name = st.sidebar.selectbox("menu", ["What2Eat", "About us"])
 
 # 주소를 넣으면 위도, 경도 생성
-def geocode(address):
-    longitude, latitude = 126.962101108891, 37.5512831039192
-    address_gu = "마포구"
-    geolocator = Nominatim(user_agent="What2Eat")
-    location = geolocator.geocode(address)
-    if location:
-        address_gu = location.address.split(", ")[1]
-        print(address_gu)
-        if address_gu[-1] != "구":
-            address_gu = "마포구"
-        latitude = location.latitude
-        longitude = location.longitude
+# def geocode(center):
+#     # longitude, latitude = 126.962101108891, 37.5512831039192
+#     # address_gu = "마포구"
+#     geolocator = Nominatim(user_agent="What2Eat")
+#     location = geolocator.geocode(address)
+#     if location:
+#         address_gu = location.address.split(", ")[1]
+#         print(address_gu)
+#         if address_gu[-1] != "구":
+#             address_gu = "마포구"
+#         latitude = location.latitude
+#         longitude = location.longitude
+#     # Reverse geocode the coordinates
+#     location = geolocator.reverse(center, exactly_one=True, language="ko")
+    
+#     # Extract the address from the location object
+#     address = location.raw['address']
+
+#     # Extract the Korean address components
+#     korean_address = {
+#         'country': address.get('country', ''),
+#         'city': address.get('city', ''),
+#         'town': address.get('town', ''),
+#         'village': address.get('village', ''),
+#         'road': address.get('road', ''),
+#         'postcode': address.get('postcode', '')
+#     }
+
+#     # Extract the address from the location object
+#     # address = location.address
+#     print(korean_address)
         
-        return longitude, latitude, address_gu
-    else:
-        return longitude, latitude, address_gu
+#         # return longitude, latitude, address_gu
+#     # else:
+#         # return longitude, latitude, address_gu
 
 # 지도에 Pop시 정보창 생성
 def popup_html(df,count, likepoint,menu, unlike):
@@ -177,11 +196,15 @@ def main(result_df_inner_join, x, y):
             result_df_inner_join = result_df_inner_join.reset_index(drop=False)
             result_list_inner_join = result_df_inner_join['diner_idx'].to_list()
             result_list_inner_join = [result for result in result_list_inner_join if not math.isnan(result)]
-            result_lst = Counter()
+            result_lst = Counter(result_list_inner_join)
 
 
             # 지도시각화
             m = folium.Map(location=[y, x], zoom_start=15)
+            # Get the center coordinates
+            # now_center = m.get_center()
+            
+            
             marker_cluster = MarkerCluster().add_to(m)
             for diner_idx, cnt in result_lst.items():
 
@@ -249,7 +272,8 @@ def main(result_df_inner_join, x, y):
 def makingquery(diner_category, address_gu, df_diner):
     personalAverageScoreRow = 3.8
         
-    result_df = df_diner.query(f"(diner_category_middle == '{diner_category}') and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow}) and (diner_address_gu == '{address_gu}')")
+    # result_df = df_diner.query(f"(diner_category_middle == '{diner_category}')  and (diner_address_constituency == '{address_gu}') and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow})")
+    result_df = df_diner.query(f"(diner_category_middle == '{diner_category}')  and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow})")
     result_df_inner_join = pd.merge(df_review, result_df, on='diner_idx', how='inner')
 
     thisRestaurantScore = 4.0
@@ -269,12 +293,11 @@ def findGu(address_str):
     else:
         return default_ans
 
-df_diner = pd.read_excel('./matki_DB.xlsx', sheet_name='diner', index_col=0)
-df_review = pd.read_excel('./matki_DB.xlsx', sheet_name='review', index_col=0)
-df_diner['diner_address_gu'] = df_diner['diner_address'].apply(findGu)
+df_diner = pd.read_excel('./whatToEat_DB_seoul.xlsx', sheet_name='diner', index_col=0)
+df_review = pd.read_excel('./whatToEat_DB_seoul.xlsx', sheet_name='review', index_col=0)
 
 # 소개창
-if name == "Welcome":
+if name == "About us":
     st.image(BannerImage)
     st.write("# Hello, What2Eat World")
     st.write("보유 음식점 수: {0}개 깐깐한 평가 수: {1}개".format(
@@ -292,7 +315,7 @@ if name == "Welcome":
 
     st.write("## 1. 사용방법")
     st.write(
-        "0. 왼쪽 사이드에서 kakaoRok으로 갑니다. \n1. 음식 카테고리는 숫자로 입력하시면 됩니다. \n2. 지역 검색은 행정구역 단위로 검색하시면 됩니다. 예를 들어, 망원동/ 영등포구 등등..")
+        "0. 왼쪽 사이드에서 What2Eat으로 갑니다. \n1. 음식 카테고리는 숫자로 입력하시면 됩니다. \n2. 지역 검색은 행정구역 단위로 검색하시면 됩니다. 예를 들어, 망원동/ 영등포구 등등..")
 
     st.write(
         "## 2. 서비스 중인 지역 입니다. \n 2호선 위주로 차츰 늘려가겠습니다. 혹시 급하게 원하는 지역이 있다면 카톡 주세요.(ID: rockik)"
@@ -305,7 +328,7 @@ if name == "Welcome":
     # )
 
 # 기능창
-elif name == "kakaoRok":
+elif name == "What2Eat":
     
     st.write("# 깐깐한 리뷰어들이 극찬한 음식점을 찾아줍니다. ")
 
@@ -316,25 +339,26 @@ elif name == "kakaoRok":
     set(df_diner['diner_category_middle'].to_list()))
 
     # input_cat = st.text_input("카테고리를 설정해주세요(번호) : ", value="11")
-    region = st.text_input("검색할 지역을 입력해주세요(ex 영등포구 or 속초시)", value="서울특별시 마포구 합정동")
+    # region = st.text_input("검색할 지역을 입력해주세요(ex 영등포구)", value="서울특별시 마포구 합정동")
     # size = st.radio(
     # "사이즈를 위해 사용 중인 디바이스 선택",
     # ('Phone', 'Web'))
-    people_counts = st.slider('깐깐한 리뷰어 몇 명이상의 식당만 표시할까요?', 1, 50, 4)
+    people_counts = 5
     # hate_counts = st.slider('불호 리뷰어 해당 명이상의 식당은 별도 표기합니다', 1, 20, 3)
     wdt = st.slider('화면 가로 크기', 320, 1536, 400)
     hght = st.slider('화면 세로 크기', 500, 2048, 700)
 
 
 
-    if bool(diner_category) and bool(region):
+    if bool(diner_category):
         # 사용자 위도경도 생성
-        x, y, address_gu = geocode(region)
+        # x, y, address_gu = geocode(region)
+        longitude, latitude = 126.991290, 37.573341
 
-        
+        address_gu = '중구'
         result_df_inner_join = makingquery(diner_category, address_gu, df_diner)
         st.write()
         st.write("# {}(음식점, 깐깐한 리뷰어 수)".format(diner_category))
-
-        main(result_df_inner_join, x, y)
-        
+        # st.dataframe(result_df_inner_join)
+        main(result_df_inner_join, longitude, latitude)
+        people_counts = st.slider('깐깐한 리뷰어 몇 명이상의 식당만 표시할까요?', 1, 50, 4)
