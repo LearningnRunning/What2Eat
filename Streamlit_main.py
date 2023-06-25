@@ -11,10 +11,11 @@ import math
 from geopy.geocoders import Nominatim
 from collections import Counter
 from PIL import Image
+from time import time
 
-BannerImage = Image.open('./img_data/WhatToEat.png')
+BannerImage = Image.open('./img_data/what2eat-logo.png')
 
-st.sidebar.header("KakaoRok")
+st.sidebar.header("오늘 뭐 먹?")
 name = st.sidebar.selectbox("menu", ["What2Eat", "About us"])
 
 # 주소를 넣으면 위도, 경도 생성
@@ -96,38 +97,38 @@ def popup_html(df,count, likepoint,menu, unlike):
 <h5 style="margin-bottom:10"; width="200px">{0}명의 리뷰어가 4점 이상으로 평가하였습니다.{1}</h4>""".format(count, unlike) + """
 
 </head>
-    <table style="height: 126px; width: 350px;">
+    <table style="height: 126px; width: 500px;">
 <tbody>
 
 
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">업종</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(category1) + """
+<td style="width: 30px;background-color: """+ left_col_color +""";"><span style="color: #ffffff;">업종</span></td>
+<td style="width: 100px;background-color: """+ right_col_color +""";">{}</td>""".format(category1) + """
 </tr>
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">평균 평점</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(score_min) + """
+<td style="width: 30px;background-color: """+ left_col_color +""";"><span style="color: #ffffff;">평균 평점</span></td>
+<td style="width: 100px;background-color: """+ right_col_color +""";">{}</td>""".format(score_min) + """
 </tr>
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">평점수/ 블로그 리뷰수</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{0} 개/ {1}개</td>""".format(review_num, blog_review_num) + """
+<td style="width: 30px;background-color: """+ left_col_color +""";"><span style="color: #ffffff;">평점수/ 블로그 리뷰수</span></td>
+<td style="width: 100px;background-color: """+ right_col_color +""";">{0} 개/ {1}개</td>""".format(review_num, blog_review_num) + """
 </tr>
 
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">메뉴</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(menu) + """
+<td style="width: 30px;background-color: """+ left_col_color +""";"><span style="color: #ffffff;">메뉴</span></td>
+<td style="width: 100px;background-color: """+ right_col_color +""";">{}</td>""".format(menu) + """
 </tr>
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">요약</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(likepoint) + """
+<td style="width: 30px;background-color: """+ left_col_color +""";"><span style="color: #ffffff;">요약</span></td>
+<td style="width: 100px;background-color: """+ right_col_color +""";">{}</td>""".format(likepoint) + """
 </tr>
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">영업시간</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(open_time) + """
+<td style="width: 30px;background-color: """+ left_col_color +""";"><span style="color: #ffffff;">영업시간</span></td>
+<td style="width: 100px;background-color: """+ right_col_color +""";">{}</td>""".format(open_time) + """
 </tr>
 <tr>
-<td style="background-color: """+ left_col_color +""";"><span style="color: #ffffff;">주소</span></td>
-<td style="width: 150px;background-color: """+ right_col_color +""";">{}</td>""".format(address) + """
+<td style="width: 30px;background-color: """+ left_col_color +""";"><span style="color: #ffffff;">주소</span></td>
+<td style="width: 100px;background-color: """+ right_col_color +""";">{}</td>""".format(address) + """
 </tr>
 
 </tbody>
@@ -191,7 +192,7 @@ cat = {
 }
 
 
-def main(result_df_inner_join, x, y):
+def main(result_df_inner_join, x, y, people_counts):
             ## 최적화
             result_df_inner_join = result_df_inner_join.reset_index(drop=False)
             result_list_inner_join = result_df_inner_join['diner_idx'].to_list()
@@ -207,18 +208,19 @@ def main(result_df_inner_join, x, y):
             
             marker_cluster = MarkerCluster().add_to(m)
             for diner_idx, cnt in result_lst.items():
-
+                # print(diner_idx, cnt)
                 try:
-                    personalAverageScoreRow = 3.2
+                    personalAverageScoreRow = 1.2
                     thisRestaurantScore = 2.0
 
                         ## 쿼리문 대체
                     bad_reviews = result_df_inner_join.query(
                                             f"(diner_idx == '{diner_idx}')" + 
-                                            f"and (diner_review_avg >= {personalAverageScoreRow})" + 
-                                            f"and (reviewer_review_score <= {thisRestaurantScore})"
+                                            f" and (reviewer_avg >= {personalAverageScoreRow})" + 
+                                            f" and (reviewer_review_score <= {thisRestaurantScore})"
                                             )
-
+                    if len(bad_reviews) > 3:
+                        print(len(bad_reviews))
                     ## 쿼리문 대체
                     detail = result_df_inner_join[result_df_inner_join['diner_idx'] == diner_idx].iloc[-1, :]
             
@@ -271,11 +273,16 @@ def main(result_df_inner_join, x, y):
 @st.cache
 def makingquery(diner_category, address_gu, df_diner):
     personalAverageScoreRow = 3.8
-        
+    start = time() # Starting timer
     # result_df = df_diner.query(f"(diner_category_middle == '{diner_category}')  and (diner_address_constituency == '{address_gu}') and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow})")
     result_df = df_diner.query(f"(diner_category_middle == '{diner_category}')  and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow})")
     result_df_inner_join = pd.merge(df_review, result_df, on='diner_idx', how='inner')
-
+    
+    end_time = time()
+    elapsed_time = end_time - start
+    print(f"Elapsed time: {elapsed_time:.6f} seconds")
+    
+    
     thisRestaurantScore = 4.0
     
     result_df_inner_join = result_df_inner_join.query(f"reviewer_review_score >= {thisRestaurantScore}")
@@ -293,8 +300,8 @@ def findGu(address_str):
     else:
         return default_ans
 
-df_diner = pd.read_excel('./whatToEat_DB_seoul.xlsx', sheet_name='diner', index_col=0)
-df_review = pd.read_excel('./whatToEat_DB_seoul.xlsx', sheet_name='review', index_col=0)
+df_diner = pd.read_excel('./whatToEat_DB_all.xlsx', sheet_name='diner', index_col=0)
+df_review = pd.read_excel('./whatToEat_DB_all.xlsx', sheet_name='review', index_col=0)
 
 # 소개창
 if name == "About us":
@@ -329,17 +336,17 @@ if name == "About us":
 
 # 기능창
 elif name == "What2Eat":
+    st.image(BannerImage, width=350, use_column_width=True)
     
-    st.write("# 깐깐한 리뷰어들이 극찬한 음식점을 찾아줍니다. ")
-
+    # st.write("# 깐깐한 리뷰어들이 극찬한 음식점을 찾아줍니다. ")
     st.write("## 카테고리를 골라보세요.")
     # X_Point
     diner_category = st.radio(
     "",
-    set(df_diner['diner_category_middle'].to_list()))
+    [category for category in list(set(df_diner['diner_category_middle'].to_list())) if category not in ['음식점']]
+    )
 
     # input_cat = st.text_input("카테고리를 설정해주세요(번호) : ", value="11")
-    # region = st.text_input("검색할 지역을 입력해주세요(ex 영등포구)", value="서울특별시 마포구 합정동")
     # size = st.radio(
     # "사이즈를 위해 사용 중인 디바이스 선택",
     # ('Phone', 'Web'))
@@ -359,6 +366,9 @@ elif name == "What2Eat":
         result_df_inner_join = makingquery(diner_category, address_gu, df_diner)
         st.write()
         st.write("# {}(음식점, 깐깐한 리뷰어 수)".format(diner_category))
-        # st.dataframe(result_df_inner_join)
-        main(result_df_inner_join, longitude, latitude)
-        people_counts = st.slider('깐깐한 리뷰어 몇 명이상의 식당만 표시할까요?', 1, 50, 4)
+
+        if len(result_df_inner_join) > 3:
+            main(result_df_inner_join, longitude, latitude, people_counts)
+            people_counts = st.slider('깐깐한 리뷰어 몇 명이상의 식당만 표시할까요?', 1, 50, 4)
+        else:
+            st.write('### 아쉽지만 기준에 맞는 맛집이 없네요...')

@@ -10,3 +10,4 @@ __pycache__/
 *$py.class
 auth.py
 .streamlit/secrets.toml
+seoul_data/whatToEat_DB_all_raw.xlsx
