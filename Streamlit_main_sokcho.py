@@ -18,42 +18,6 @@ BannerImage = Image.open('./img_data/what2eat-logo.png')
 st.sidebar.header("오늘 뭐 먹?")
 name = st.sidebar.selectbox("menu", ["What2Eat", "About us"])
 
-# 주소를 넣으면 위도, 경도 생성
-# def geocode(center):
-#     # longitude, latitude = 126.962101108891, 37.5512831039192
-#     # address_gu = "마포구"
-#     geolocator = Nominatim(user_agent="What2Eat")
-#     location = geolocator.geocode(address)
-#     if location:
-#         address_gu = location.address.split(", ")[1]
-#         print(address_gu)
-#         if address_gu[-1] != "구":
-#             address_gu = "마포구"
-#         latitude = location.latitude
-#         longitude = location.longitude
-#     # Reverse geocode the coordinates
-#     location = geolocator.reverse(center, exactly_one=True, language="ko")
-    
-#     # Extract the address from the location object
-#     address = location.raw['address']
-
-#     # Extract the Korean address components
-#     korean_address = {
-#         'country': address.get('country', ''),
-#         'city': address.get('city', ''),
-#         'town': address.get('town', ''),
-#         'village': address.get('village', ''),
-#         'road': address.get('road', ''),
-#         'postcode': address.get('postcode', '')
-#     }
-
-#     # Extract the address from the location object
-#     # address = location.address
-#     print(korean_address)
-        
-#         # return longitude, latitude, address_gu
-#     # else:
-#         # return longitude, latitude, address_gu
 
 # 지도에 Pop시 정보창 생성
 def popup_html(df,count, likepoint,menu, unlike):
