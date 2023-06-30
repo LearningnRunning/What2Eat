@@ -22,7 +22,7 @@ name = st.sidebar.selectbox("menu", ["What2Eat", "About us"])
 # 지도에 Pop시 정보창 생성
 def popup_html(df,count, likepoint,menu, unlike):
     name=df['diner_name']
-    category1=df['diner_category_large']
+    category1=f"{df['diner_category_large']} > {df['diner_category_meddle']} > {df['diner_category_small']} > {df['diner_category_detail']}"
     address = df['diner_address'] 
     review_num=df['diner_review_cnt']
     if isinstance(review_num, (int,str)):
