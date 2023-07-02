@@ -161,8 +161,8 @@ def main(result_df_inner_join, x, y, people_counts):
             result_df_inner_join = result_df_inner_join.reset_index(drop=False)
             result_list_inner_join = result_df_inner_join['diner_idx'].to_list()
             result_list_inner_join = [result for result in result_list_inner_join if not math.isnan(result)]
-            result_lst = Counter(result_list_inner_join)
-
+            result_lst = Counter(result_list_inner_join).most_common()
+            st.text(result_lst)
 
             # 지도시각화
             m = folium.Map(location=[y, x], zoom_start=14)
@@ -322,6 +322,7 @@ elif name == "What2Eat":
         # st.dataframe(result_df_inner_join)
 
         if len(result_df_inner_join) > 3:
+            
             main(result_df_inner_join, longitude, latitude, people_counts)
             people_counts = st.slider('깐깐한 리뷰어 몇 명이상의 식당만 표시할까요?', 1, 50, 4)
         else:
