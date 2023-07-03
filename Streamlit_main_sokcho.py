@@ -156,13 +156,17 @@ cat = {
 }
 
 
-def main(result_df_inner_join, x, y, people_counts):
+def main(result_df_inner_join, df_diner,  x, y, people_counts):
             ## 최적화
-            result_df_inner_join = result_df_inner_join.reset_index(drop=False)
-            result_list_inner_join = result_df_inner_join['diner_idx'].to_list()
-            result_list_inner_join = [result for result in result_list_inner_join if not math.isnan(result)]
-            result_lst = Counter(result_list_inner_join).most_common()
-            st.text(result_lst)
+            
+            result_df_inner_join.dropna(subset=['diner_idx'], inplace=True)
+            # result_df_inner_join = result_df_inner_join.reset_index(drop=False)
+            
+            result_lst = result_df_inner_join['diner_idx'].to_list()
+            result_lst = Counter(result_lst)
+            desired_df = result_df_inner_join.loc[result_df_inner_join['diner_idx'].isin(list(result_lst.keys())), ['diner_name', 'diner_url', 'diner_category_small', 'diner_open_time']]
+            desired_df = desired_df.drop_duplicates()
+            st.dataframe(desired_df)
 
             # 지도시각화
             m = folium.Map(location=[y, x], zoom_start=14)
@@ -323,7 +327,7 @@ elif name == "What2Eat":
 
         if len(result_df_inner_join) > 3:
             
-            main(result_df_inner_join, longitude, latitude, people_counts)
+            main(result_df_inner_join, df_diner, longitude, latitude, people_counts)
             people_counts = st.slider('깐깐한 리뷰어 몇 명이상의 식당만 표시할까요?', 1, 50, 4)
         else:
             st.write('### 아쉽지만 기준에 맞는 맛집이 없네요...')

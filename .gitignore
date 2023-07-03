@@ -11,3 +11,4 @@ __pycache__/
 auth.py
 .streamlit/secrets.toml
 seoul_data/whatToEat_DB_all_raw.xlsx
+seoul_data/whatToEat_DB_socho_extra_raw.xlsx
