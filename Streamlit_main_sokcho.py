@@ -257,8 +257,8 @@ def makingquery(diner_category, address_gu, df_diner):
     return result_df_inner_join
 
 
-df_diner = pd.read_excel('./seoul_data/whatToEat_DB_socho_extra.xlsx', sheet_name='diner', index_col=0)
-df_review = pd.read_excel('./seoul_data/whatToEat_DB_socho_extra.xlsx', sheet_name='review', index_col=0)
+df_diner = pd.read_excel('./seoul_data/whatToEat_DB_gangwon.xlsx', sheet_name='diner', index_col=0)
+df_review = pd.read_excel('./seoul_data/whatToEat_DB_gangwon.xlsx', sheet_name='review', index_col=0)
 
 # 소개창
 if name == "About us":
