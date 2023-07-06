@@ -13,7 +13,7 @@ from collections import Counter
 from PIL import Image
 from time import time
 
-BannerImage = Image.open('./img_data/what2eat-logo.png')
+BannerImage = Image.open('./img_data/what2eat-logo-gangwon.png')
 
 st.sidebar.header("오늘 뭐 먹?")
 name = st.sidebar.selectbox("menu", ["What2Eat", "About us"])
@@ -164,11 +164,18 @@ def main(result_df_inner_join, df_diner,  x, y, people_counts):
             
             result_lst = result_df_inner_join['diner_idx'].to_list()
             result_lst = Counter(result_lst)
-            desired_df = result_df_inner_join.loc[result_df_inner_join['diner_idx'].isin(list(result_lst.keys())), ['diner_name', 'diner_url', 'diner_category_small', 'diner_open_time']]
+            desired_df = result_df_inner_join.loc[result_df_inner_join['diner_idx'].isin(list(result_lst.keys())), ['diner_idx', 'diner_name', 'diner_url', 'diner_category_small', 'diner_open_time']] #,'diner_lon', 'diner_lat'
+            result_dict = dict(result_lst)
             desired_df = desired_df.drop_duplicates()
-            st.dataframe(desired_df)
+            desired_df['real_review_cnt'] = desired_df['diner_idx'].apply(lambda idx: result_dict[idx])
 
-            # 지도시각화
+
+            # st.dataframe(desired_df,unsafe_allow_html=True)
+            # st.components.html(desired_df.to_html(escape=False), scrolling=True)
+            st.markdown(desired_df.sort_values('real_review_cnt', ascending=False).to_html(render_links=True),unsafe_allow_html=True)
+            # # 지도시각화
+            # if desired_df:
+            #     desired_df.loc[0,['diner_lon', 'diner_lat']]
             m = folium.Map(location=[y, x], zoom_start=14)
             # Get the center coordinates
             # now_center = m.get_center()
@@ -293,7 +300,7 @@ if name == "About us":
 
 # 기능창
 elif name == "What2Eat":
-    
+    st.image(BannerImage)
     st.write("# 깐깐한 리뷰어들이 극찬한 음식점을 찾아줍니다. ")
 
     st.write("## 카테고리를 골라보세요.")
