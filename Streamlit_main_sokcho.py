@@ -154,7 +154,8 @@ cat = {
     "면류": ["국수", "냉면", "일본식라면"],
     "샌드위치,샐러드": ["샐러디", "써브웨이", "샌드위치"],
 }
-
+def create_link(url:str) -> str:
+    return f"<a href='{url}'>🔗</a>"
 
 def main(result_df_inner_join, df_diner,  x, y, people_counts):
             ## 최적화
@@ -168,7 +169,7 @@ def main(result_df_inner_join, df_diner,  x, y, people_counts):
             result_dict = dict(result_lst)
             desired_df = desired_df.drop_duplicates()
             desired_df['real_review_cnt'] = desired_df['diner_idx'].apply(lambda idx: result_dict[idx])
-
+            desired_df['diner_url_img'] = [create_link(url) for url in desired_df["diner_url"]]
 
             # st.dataframe(desired_df,unsafe_allow_html=True)
             # st.components.html(desired_df.to_html(escape=False), scrolling=True)
