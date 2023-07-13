@@ -288,7 +288,7 @@ def makingquery(diner_category, address_gu, df_diner):
     personalAverageScoreRow = 3.8
 
     # result_df = df_diner.query(f"(diner_category_middle == '{diner_category}')  and (diner_address_constituency == '{address_gu}') and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow})")
-    result_df = df_diner.query(f"(diner_category_middle == '{diner_category}')  and (diner_address_constituency in @address_gu) and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow})")
+    result_df = df_diner.query(f"(diner_category_middle in @diner_category)  and (diner_address_constituency in @address_gu) and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow})")
     result_df_inner_join = pd.merge(df_review, result_df, on='diner_idx', how='inner')
     
     thisRestaurantScore = 4.0
@@ -347,26 +347,24 @@ elif name == "What2Eat":
     st.image(BannerImage, width=350, use_column_width=True)
     
     # st.write("# 깐깐한 리뷰어들이 극찬한 음식점을 찾아줍니다. ")
-    st.write("## 카테고리를 골라보세요.")
-    # X_Point
-    diner_category = st.radio(
-    "",
-    [category for category in list(set(df_diner['diner_category_middle'].to_list())) if category not in ['음식점']]
-    )
+    # st.write("## 카테고리를 골라보세요.")
+    
+    diner_category_lst = [category for category in list(set(df_diner['diner_category_middle'].to_list())) if category not in ['음식점']]
+    st.write("##  오늘 뭐가 당겨?(복수가능)")
+    diner_category = st.multiselect("", diner_category_lst)
     # Create a list of options
     constituency_options = list(set(df_diner['diner_address_constituency'].to_list()))
-
+    st.write("##  오늘 어디서 당겨?(복수가능)")
     # Create a multi-select radio button
-    seleted_constituency = st.multiselect("찾을 지역을 고르세요.(복수선택)", constituency_options)
-    print(seleted_constituency)
+    seleted_constituency = st.multiselect("", constituency_options)
     # input_cat = st.text_input("카테고리를 설정해주세요(번호) : ", value="11")
     # size = st.radio(
     # "사이즈를 위해 사용 중인 디바이스 선택",
     # ('Phone', 'Web'))
     people_counts = 5
     # hate_counts = st.slider('불호 리뷰어 해당 명이상의 식당은 별도 표기합니다', 1, 20, 3)
-    wdt = st.slider('화면 가로 크기', 320, 1536, 400)
-    hght = st.slider('화면 세로 크기', 500, 2048, 700)
+    # wdt = st.slider('화면 가로 크기', 320, 1536, 400)
+    # hght = st.slider('화면 세로 크기', 500, 2048, 700)
 
 
 
@@ -377,8 +375,7 @@ elif name == "What2Eat":
 
         # address_gu = '중구'
         result_df_inner_join = makingquery(diner_category, seleted_constituency, df_diner)
-        st.write()
-        st.write("# {}(음식점, 깐깐한 리뷰어 수)".format(diner_category))
+
 
         if len(result_df_inner_join) > 3:
             main(result_df_inner_join, longitude, latitude, people_counts)
