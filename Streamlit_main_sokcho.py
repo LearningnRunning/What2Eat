@@ -169,7 +169,7 @@ def main(result_df_inner_join, df_diner,  x, y, people_counts):
             result_dict = dict(result_lst)
             desired_df = desired_df.drop_duplicates()
             desired_df['real_review_cnt'] = desired_df['diner_idx'].apply(lambda idx: result_dict[idx])
-            desired_df['diner_url_img'] = [create_link(url) for url in desired_df["diner_url"]]
+            desired_df['diner_url_img'] = desired_df['diner_url'].apply(create_link)
 
             # st.dataframe(desired_df,unsafe_allow_html=True)
             # st.components.html(desired_df.to_html(escape=False), scrolling=True)
@@ -177,7 +177,7 @@ def main(result_df_inner_join, df_diner,  x, y, people_counts):
             # # 지도시각화
             # if desired_df:
             #     desired_df.loc[0,['diner_lon', 'diner_lat']]
-            m = folium.Map(location=[y, x], zoom_start=14)
+            m = folium.Map(location=[y, x], zoom_start=12)
             # Get the center coordinates
             # now_center = m.get_center()
             
@@ -264,9 +264,15 @@ def makingquery(diner_category, address_gu, df_diner):
 
     return result_df_inner_join
 
+@st.cache
+def load_excel_data():
+    # Load the Excel data and create the DataFrame
+    df_diner = pd.read_excel('./seoul_data/whatToEat_DB_gangwon.xlsx', sheet_name='diner', index_col=0)
+    df_review = pd.read_excel('./seoul_data/whatToEat_DB_gangwon.xlsx', sheet_name='review', index_col=0)
 
-df_diner = pd.read_excel('./seoul_data/whatToEat_DB_gangwon.xlsx', sheet_name='diner', index_col=0)
-df_review = pd.read_excel('./seoul_data/whatToEat_DB_gangwon.xlsx', sheet_name='review', index_col=0)
+    return df_diner, df_review
+
+df_diner, df_review = load_excel_data()
 
 # 소개창
 if name == "About us":
