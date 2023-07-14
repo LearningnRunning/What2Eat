@@ -191,8 +191,8 @@ cat = {
     "샌드위치,샐러드": ["샐러디", "써브웨이", "샌드위치"],
 }
 
-def create_link(url:str) -> str:
-    return f"<a href='{url}'>🔗</a>"
+# def create_link(url:str) -> str:
+#     return f"<a href='{url}'>🔗</a>"
 
 
 def main(result_df_inner_join, x, y, people_counts):
@@ -206,7 +206,7 @@ def main(result_df_inner_join, x, y, people_counts):
             desired_df = desired_df.drop_duplicates()
             desired_df['real_review_cnt'] = desired_df['diner_idx'].apply(lambda idx: result_dict[idx])
 
-            desired_df['diner_url_img'] = [create_link(url) for url in desired_df["diner_url"]]
+            # desired_df['diner_url_img'] = [create_link(url) for url in desired_df["diner_url"]]
             desired_df = desired_df.iloc[:,1:]
             # st.dataframe(desired_df,unsafe_allow_html=True)
             # st.components.html(desired_df.to_html(escape=False), scrolling=True)
@@ -285,10 +285,10 @@ def main(result_df_inner_join, x, y, people_counts):
 
 @st.cache
 def makingquery(diner_category, address_gu, df_diner):
-    personalAverageScoreRow = 3.8
+    personalAverageScoreRow = 3.3
 
     # result_df = df_diner.query(f"(diner_category_middle == '{diner_category}')  and (diner_address_constituency == '{address_gu}') and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow})")
-    result_df = df_diner.query(f"(diner_category_middle in @diner_category)  and (diner_address_constituency in @address_gu) and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow})")
+    result_df = df_diner.query(f"(diner_category_middle in @diner_category)  and (diner_address_constituency in @address_gu) and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg >= {personalAverageScoreRow})")
     result_df_inner_join = pd.merge(df_review, result_df, on='diner_idx', how='inner')
     
     thisRestaurantScore = 4.0
@@ -308,8 +308,15 @@ def findGu(address_str):
     else:
         return default_ans
 
-df_diner = pd.read_excel('./whatToEat_DB_all.xlsx', sheet_name='diner', index_col=0)
-df_review = pd.read_excel('./whatToEat_DB_all.xlsx', sheet_name='review', index_col=0)
+@st.cache
+def load_excel_data():
+    # Load the Excel data and create the DataFrame
+    df_diner = pd.read_excel('./whatToEat_DB_all.xlsx', sheet_name='diner', index_col=0)
+    df_review = pd.read_excel('./whatToEat_DB_all.xlsx', sheet_name='review', index_col=0)
+
+    return df_diner, df_review
+
+df_diner, df_review = load_excel_data()
 
 # 소개창
 if name == "About us":
@@ -319,7 +326,6 @@ if name == "About us":
             len(set(df_diner["diner_name"].to_list())), len(df_diner["diner_name"].to_list())
         ))
     
-
     st.write("## 0. 서비스 설명")
     st.write(
         "1. 음식점 평균 평점이 3.0 이상\n2. 리뷰어 개인 평균 평점이 3.8 이하지만 해당 음식점에는 4.0 이상으로 평가한 리뷰어\n"
@@ -366,9 +372,9 @@ elif name == "What2Eat":
     # wdt = st.slider('화면 가로 크기', 320, 1536, 400)
     # hght = st.slider('화면 세로 크기', 500, 2048, 700)
 
+    print(bool(diner_category) and bool(seleted_constituency))
 
-
-    if bool(diner_category):
+    if bool(diner_category) and bool(seleted_constituency):
         # 사용자 위도경도 생성
         # x, y, address_gu = geocode(region)
         longitude, latitude = 126.991290, 37.573341
