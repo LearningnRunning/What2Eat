@@ -355,11 +355,11 @@ elif name == "What2Eat":
     # st.write("# 깐깐한 리뷰어들이 극찬한 음식점을 찾아줍니다. ")
     # st.write("## 카테고리를 골라보세요.")
     
-    diner_category_lst = [category for category in list(set(df_diner['diner_category_middle'].to_list())) if category not in ['음식점']]
+    diner_category_lst = sorted([category for category in list(set(df_diner['diner_category_middle'].to_list())) if category not in ['음식점']])
     st.write("##  오늘 뭐가 당겨?(복수가능)")
     diner_category = st.multiselect("", diner_category_lst)
     # Create a list of options
-    constituency_options = list(set(df_diner['diner_address_constituency'].to_list()))
+    constituency_options = sorted(list(set(df_diner['diner_address_constituency'].to_list())))
     st.write("##  오늘 어디서 당겨?(복수가능)")
     # Create a multi-select radio button
     seleted_constituency = st.multiselect("", constituency_options)
