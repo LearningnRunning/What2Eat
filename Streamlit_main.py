@@ -191,22 +191,26 @@ cat = {
     "샌드위치,샐러드": ["샐러디", "써브웨이", "샌드위치"],
 }
 
-# def create_link(url:str) -> str:
-#     return f"<a href='{url}'>🔗</a>"
 
 
-def main(result_df_inner_join, x, y, people_counts):
+def main(df_diner, result_df_inner_join, result_df_inner_join_bad, x, y, people_counts):
             result_df_inner_join.dropna(subset=['diner_idx'], inplace=True)
             # result_df_inner_join = result_df_inner_join.reset_index(drop=False)
-            
-            result_lst = result_df_inner_join['diner_idx'].to_list()
-            result_lst = Counter(result_lst)
-            desired_df = result_df_inner_join.loc[result_df_inner_join['diner_idx'].isin(list(result_lst.keys())), ['diner_idx', 'diner_address_constituency', 'diner_name', 'diner_url', 'diner_category_small', 'diner_open_time']] #,'diner_lon', 'diner_lat'
-            result_dict = dict(result_lst)
-            desired_df = desired_df.drop_duplicates()
-            desired_df['real_review_cnt'] = desired_df['diner_idx'].apply(lambda idx: result_dict[idx])
+            # Calculate the row_counts
+            row_counts = result_df_inner_join.groupby('diner_idx').size()
 
-            # desired_df['diner_url_img'] = [create_link(url) for url in desired_df["diner_url"]]
+            # Filter the DataFrame based on the condition
+            desired_df = df_diner[df_diner['diner_idx'].map(row_counts) > 3]
+  
+            # Assign the row_counts values to the 'real_review_cnt' column
+            desired_df['real_review_cnt'] = desired_df['diner_idx'].map(row_counts)
+
+            # Assuming your data is stored in a DataFrame called 'df'
+            unique_categories = desired_df['diner_category_small'].unique().tolist()           
+            # Create a multi-select radio button
+            seleted_constituency = st.multiselect("안 당기는 건 빼!", unique_categories, default=unique_categories)
+            desired_df = desired_df[desired_df['diner_category_small'].isin(unique_categories)]
+            
             desired_df = desired_df.iloc[:,1:]
             # st.dataframe(desired_df,unsafe_allow_html=True)
             # st.components.html(desired_df.to_html(escape=False), scrolling=True)
@@ -285,35 +289,42 @@ def main(result_df_inner_join, x, y, people_counts):
 
 @st.cache
 def makingquery(diner_category, address_gu, df_diner):
-    personalAverageScoreRow = 3.3
+    diner_review_avg = 3.5
 
-    # result_df = df_diner.query(f"(diner_category_middle == '{diner_category}')  and (diner_address_constituency == '{address_gu}') and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {personalAverageScoreRow})")
-    result_df = df_diner.query(f"(diner_category_middle in @diner_category)  and (diner_address_constituency in @address_gu) and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg >= {personalAverageScoreRow})")
+    # result_df = df_diner.query(f"(diner_category_middle == '{diner_category}')  and (diner_address_constituency == '{address_gu}') and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {diner_review_avg})")
+    result_df = df_diner.query(f"(diner_category_middle in @diner_category)  and (diner_address_constituency in @address_gu) and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg >= {diner_review_avg})")
     result_df_inner_join = pd.merge(df_review, result_df, on='diner_idx', how='inner')
     
+    personalAverageScoreRow = 3.2
     thisRestaurantScore = 4.0
     
-    result_df_inner_join = result_df_inner_join.query(f"reviewer_review_score >= {thisRestaurantScore}")
+    result_df_inner_join = result_df_inner_join.query(f"(reviewer_avg <= {personalAverageScoreRow}) and (reviewer_review_score >= {thisRestaurantScore})")
 
-    return result_df_inner_join
+    
+    personalAverageScoreRow = 4.0
+    thisRestaurantScore = 1.5
+    
+    result_df_inner_join_bad = result_df_inner_join.query(f"(reviewer_avg >= {personalAverageScoreRow}) and (reviewer_review_score <= {thisRestaurantScore})")
 
-def findGu(address_str):
-    default_ans = "마포구"
-    if type(address_str) == str:
-        gu_str = address_str.split(' ')[1]
-        if gu_str[-1] == '구':
-            return gu_str
-        else:
-            return default_ans
-    else:
-        return default_ans
+    return result_df_inner_join, result_df_inner_join_bad
+
+# def findGu(address_str):
+#     default_ans = "마포구"
+#     if type(address_str) == str:
+#         gu_str = address_str.split(' ')[1]
+#         if gu_str[-1] == '구':
+#             return gu_str
+#         else:
+#             return default_ans
+#     else:
+#         return default_ans
 
 @st.cache
 def load_excel_data():
     # Load the Excel data and create the DataFrame
     df_diner = pd.read_excel('./whatToEat_DB_all.xlsx', sheet_name='diner', index_col=0)
     df_review = pd.read_excel('./whatToEat_DB_all.xlsx', sheet_name='review', index_col=0)
-
+    df_diner['diner_category_detail'].fillna('', inplace=True)
     return df_diner, df_review
 
 df_diner, df_review = load_excel_data()
@@ -352,27 +363,20 @@ if name == "About us":
 elif name == "What2Eat":
     st.image(BannerImage, width=350, use_column_width=True)
     
-    # st.write("# 깐깐한 리뷰어들이 극찬한 음식점을 찾아줍니다. ")
-    # st.write("## 카테고리를 골라보세요.")
-    
-    diner_category_lst = sorted([category for category in list(set(df_diner['diner_category_middle'].to_list())) if category not in ['음식점']])
-    st.write("##  오늘 뭐가 당겨?(복수가능)")
-    diner_category = st.multiselect("", diner_category_lst)
+
+    st.sidebar.write("##  오늘 어디서 당겨?(복수가능)")
     # Create a list of options
     constituency_options = sorted(list(set(df_diner['diner_address_constituency'].to_list())))
-    st.write("##  오늘 어디서 당겨?(복수가능)")
     # Create a multi-select radio button
-    seleted_constituency = st.multiselect("", constituency_options)
-    # input_cat = st.text_input("카테고리를 설정해주세요(번호) : ", value="11")
-    # size = st.radio(
-    # "사이즈를 위해 사용 중인 디바이스 선택",
-    # ('Phone', 'Web'))
-    people_counts = 5
-    # hate_counts = st.slider('불호 리뷰어 해당 명이상의 식당은 별도 표기합니다', 1, 20, 3)
-    # wdt = st.slider('화면 가로 크기', 320, 1536, 400)
-    # hght = st.slider('화면 세로 크기', 500, 2048, 700)
+    seleted_constituency = st.sidebar.multiselect("", constituency_options)
+    
+    st.sidebar.write("##  오늘 뭐가 당겨?(복수가능)")
+    diner_category_lst = sorted([category for category in list(set(df_diner['diner_category_middle'].to_list())) if category not in ['음식점']])
+    diner_category = st.sidebar.multiselect("", diner_category_lst)
 
-    print(bool(diner_category) and bool(seleted_constituency))
+    people_counts = 5
+
+
 
     if bool(diner_category) and bool(seleted_constituency):
         # 사용자 위도경도 생성
@@ -380,11 +384,35 @@ elif name == "What2Eat":
         longitude, latitude = 126.991290, 37.573341
 
         # address_gu = '중구'
-        result_df_inner_join = makingquery(diner_category, seleted_constituency, df_diner)
+        result_df_inner_join, result_df_inner_join_bad = makingquery(diner_category, seleted_constituency, df_diner)
 
 
         if len(result_df_inner_join) > 3:
-            main(result_df_inner_join, longitude, latitude, people_counts)
-            people_counts = st.slider('깐깐한 리뷰어 몇 명이상의 식당만 표시할까요?', 1, 50, 4)
+            result_df_inner_join.dropna(subset=['diner_idx'], inplace=True)
+            # result_df_inner_join = result_df_inner_join.reset_index(drop=False)
+            # Calculate the row_counts
+            row_counts = result_df_inner_join.groupby('diner_idx').size()
+
+            # Filter the DataFrame based on the condition
+            desired_df = df_diner[df_diner['diner_idx'].map(row_counts) > 3]
+  
+            # Assign the row_counts values to the 'real_review_cnt' column
+            desired_df['real_review_cnt'] = desired_df['diner_idx'].map(row_counts)
+
+            # Assuming your data is stored in a DataFrame called 'df'
+            unique_categories = desired_df['diner_category_small'].unique().tolist()           
+            # Create a multi-select radio button
+            seleted_constituency = st.sidebar.multiselect("안 당기는 건 빼!", unique_categories, default=unique_categories)
+            desired_df = desired_df[desired_df['diner_category_small'].isin(seleted_constituency)]
+            # Assuming your data is stored in a DataFrame called 'df'
+            desired_df['combined_categories'] = desired_df['diner_category_small'] + ' / ' + desired_df['diner_category_detail']
+
+            desired_df = desired_df.loc[:,['diner_name','combined_categories','diner_url','diner_open_time', 'diner_address', 'real_review_cnt']]
+            # st.dataframe(desired_df,unsafe_allow_html=True)
+            # st.components.html(desired_df.to_html(escape=False), scrolling=True)
+            st.markdown(desired_df.sort_values('real_review_cnt', ascending=False).to_html(render_links=True),unsafe_allow_html=True)
+            
+            # main(df_diner, result_df_inner_join, result_df_inner_join_bad, longitude, latitude, people_counts)
+            # people_counts = st.slider('깐깐한 리뷰어 몇 명이상의 식당만 표시할까요?', 1, 50, 4)
         else:
             st.write('### 아쉽지만 기준에 맞는 맛집이 없네요...')
