@@ -17,6 +17,9 @@ BannerImage = Image.open('./img_data/what2eat-logo.png')
 
 st.sidebar.header("오늘 뭐 먹?")
 name = st.sidebar.selectbox("menu", ["What2Eat", "About us"])
+# Add custom CSS to adjust element size
+
+
 
 # 주소를 넣으면 위도, 경도 생성
 # def geocode(center):
@@ -214,7 +217,10 @@ def main(df_diner, result_df_inner_join, result_df_inner_join_bad, x, y, people_
             desired_df = desired_df.iloc[:,1:]
             # st.dataframe(desired_df,unsafe_allow_html=True)
             # st.components.html(desired_df.to_html(escape=False), scrolling=True)
-            st.markdown(desired_df.sort_values('real_review_cnt', ascending=False).to_html(render_links=True),unsafe_allow_html=True)
+            # st.markdown(desired_df.sort_values('real_review_cnt', ascending=False).to_html(render_links=True),unsafe_allow_html=True)
+            desired_df_html = desired_df.sort_values('real_review_cnt', ascending=False).to_html(render_links=True)
+            html_code = f'<div style="overflow-x:auto; max-width:100%;">{desired_df_html}</div>'
+            st.markdown(html_code, unsafe_allow_html=True)
             
 
             # # 지도시각화
@@ -408,7 +414,7 @@ elif name == "What2Eat":
             desired_df['combined_categories'] = desired_df['diner_category_small'] + ' / ' + desired_df['diner_category_detail']
 
             desired_df = desired_df.loc[:,['diner_name','combined_categories','diner_url','diner_open_time', 'diner_address', 'real_review_cnt']]
-            # st.dataframe(desired_df,unsafe_allow_html=True)
+            # st.dataframe(desired_df.sort_values('real_review_cnt', ascending=False))
             # st.components.html(desired_df.to_html(escape=False), scrolling=True)
             st.markdown(desired_df.sort_values('real_review_cnt', ascending=False).to_html(render_links=True),unsafe_allow_html=True)
             
