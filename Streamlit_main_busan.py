@@ -15,7 +15,7 @@ from time import time
 
 BannerImage = Image.open('./img_data/what2eat-logo-gangwon.png')
 
-st.sidebar.header("오늘 뭐 먹?")
+st.sidebar.header("오늘 부산에서 뭐 먹?")
 name = st.sidebar.selectbox("menu", ["What2Eat", "About us"])
 
 
