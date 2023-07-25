@@ -301,7 +301,7 @@ def makingquery(diner_category, address_gu, df_diner):
     result_df = df_diner.query(f"(diner_category_middle in @diner_category)  and (diner_address_constituency in @address_gu) and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg >= {diner_review_avg})")
     result_df_inner_join = pd.merge(df_review, result_df, on='diner_idx', how='inner')
     
-    personalAverageScoreRow = 3.2
+    personalAverageScoreRow = 3.8
     thisRestaurantScore = 4.0
     
     result_df_inner_join = result_df_inner_join.query(f"(reviewer_avg <= {personalAverageScoreRow}) and (reviewer_review_score >= {thisRestaurantScore})")
@@ -370,15 +370,15 @@ elif name == "What2Eat":
     st.image(BannerImage, width=350, use_column_width=True)
     
 
-    st.sidebar.write("##  오늘 어디서 당겨?(복수가능)")
+    st.write("##  오늘 어디서 당겨?(복수가능)")
     # Create a list of options
     constituency_options = sorted(list(set(df_diner['diner_address_constituency'].to_list())))
     # Create a multi-select radio button
-    seleted_constituency = st.sidebar.multiselect("", constituency_options)
+    seleted_constituency = st.multiselect("", constituency_options)
     
-    st.sidebar.write("##  오늘 뭐가 당겨?(복수가능)")
+    st.write("##  오늘 뭐가 당겨?(복수가능)")
     diner_category_lst = sorted([category for category in list(set(df_diner['diner_category_middle'].to_list())) if category not in ['음식점']])
-    diner_category = st.sidebar.multiselect("", diner_category_lst)
+    diner_category = st.multiselect("", diner_category_lst)
 
     people_counts = 5
 
@@ -393,7 +393,7 @@ elif name == "What2Eat":
         result_df_inner_join, result_df_inner_join_bad = makingquery(diner_category, seleted_constituency, df_diner)
 
 
-        if len(result_df_inner_join) > 3:
+        if len(result_df_inner_join) > people_counts:
             result_df_inner_join.dropna(subset=['diner_idx'], inplace=True)
             # result_df_inner_join = result_df_inner_join.reset_index(drop=False)
             # Calculate the row_counts
@@ -406,12 +406,12 @@ elif name == "What2Eat":
             desired_df['real_review_cnt'] = desired_df['diner_idx'].map(row_counts)
 
             # Assuming your data is stored in a DataFrame called 'df'
-            unique_categories = desired_df['diner_category_small'].unique().tolist()           
+            unique_categories = desired_df['diner_category_large'].unique().tolist()           
             # Create a multi-select radio button
-            seleted_constituency = st.sidebar.multiselect("안 당기는 건 빼!", unique_categories, default=unique_categories)
-            desired_df = desired_df[desired_df['diner_category_small'].isin(seleted_constituency)]
+            seleted_category = st.sidebar.multiselect("안 당기는 건 빼!", unique_categories, default=unique_categories)
+            desired_df = desired_df[desired_df['diner_category_large'].isin(seleted_category)]
             # Assuming your data is stored in a DataFrame called 'df'
-            desired_df['combined_categories'] = desired_df['diner_category_small'] + ' / ' + desired_df['diner_category_detail']
+            desired_df['combined_categories'] = desired_df['diner_category_large'] + ' / ' + desired_df['diner_category_detail']
 
             desired_df = desired_df.loc[:,['diner_name','combined_categories','diner_url','diner_open_time', 'diner_address', 'real_review_cnt']]
             # st.dataframe(desired_df.sort_values('real_review_cnt', ascending=False))
