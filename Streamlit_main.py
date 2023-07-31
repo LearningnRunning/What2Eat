@@ -406,10 +406,10 @@ elif name == "What2Eat":
             desired_df['real_review_cnt'] = desired_df['diner_idx'].map(row_counts)
 
             # Assuming your data is stored in a DataFrame called 'df'
-            unique_categories = desired_df['diner_category_large'].unique().tolist()           
+            unique_categories = desired_df['diner_category_small'].unique().tolist()           
             # Create a multi-select radio button
-            seleted_category = st.sidebar.multiselect("안 당기는 건 빼!", unique_categories, default=unique_categories)
-            desired_df = desired_df[desired_df['diner_category_large'].isin(seleted_category)]
+            seleted_category = st.multiselect("안 당기는 건 빼!", unique_categories, default=unique_categories)
+            desired_df = desired_df[desired_df['diner_category_small'].isin(seleted_category)]
             # Assuming your data is stored in a DataFrame called 'df'
             desired_df['combined_categories'] = desired_df['diner_category_large'] + ' / ' + desired_df['diner_category_detail']
 
