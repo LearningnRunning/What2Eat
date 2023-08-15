@@ -255,7 +255,7 @@ def makingquery(diner_category, address_gu, df_diner):
     
     end_time = time()
     elapsed_time = end_time - start
-    print(f"Elapsed time: {elapsed_time:.6f} seconds")
+    # print(f"Elapsed time: {elapsed_time:.6f} seconds")
     
     
     thisRestaurantScore = 4.0
