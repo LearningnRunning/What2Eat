@@ -411,7 +411,7 @@ elif name == "What2Eat":
             seleted_category = st.multiselect("안 당기는 건 빼!", unique_categories, default=unique_categories)
             desired_df = desired_df[desired_df['diner_category_small'].isin(seleted_category)]
             # Assuming your data is stored in a DataFrame called 'df'
-            desired_df['combined_categories'] = desired_df['diner_category_large'] + ' / ' + desired_df['diner_category_detail']
+            desired_df['combined_categories'] = desired_df['diner_category_small'] + ' / ' + desired_df['diner_category_detail']
 
             desired_df = desired_df.loc[:,['diner_name','combined_categories','diner_url','diner_open_time', 'diner_address', 'real_review_cnt']]
             # st.dataframe(desired_df.sort_values('real_review_cnt', ascending=False))
