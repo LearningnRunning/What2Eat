@@ -12,7 +12,7 @@ def cached_model():
 
 @st.cache(allow_output_mutation=True)
 def get_dataset():
-    df = pd.read_csv('wellness_dataset.csv')
+    df = pd.read_csv('wellness_dataset_plus.csv')
     df['embedding'] = df['embedding'].apply(json.loads)
     return df
 
@@ -48,6 +48,6 @@ if submitted and user_input:
     st.session_state.generated.append(answer['챗봇'])
 
 for i in range(len(st.session_state['past'])):
-    message(st.session_state['past'][i], is_user=True, key=str(i) + '_user')
+    message(st.session_state['past'][i], is_user=True, key=str(i) + '_user', avatar_style="big-ears-neutral")
     if len(st.session_state['generated']) > i:
-        message(st.session_state['generated'][i], key=str(i) + '_bot')
+        message(st.session_state['generated'][i], key=str(i) + '_bot', avatar_style="croodles-neutral")
