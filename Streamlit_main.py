@@ -18,7 +18,7 @@ from math import radians, sin, cos, sqrt, atan2
 BannerImage = Image.open('./img_data/what2eat-logo.png')
 
 st.sidebar.header("오늘 뭐 먹?")
-name = st.sidebar.selectbox("menu", ["What2Eat", "About us"])
+name = st.sidebar.radio("Menu", ["What2Eat", "About us"])
 # Add custom CSS to adjust element size
 
 
