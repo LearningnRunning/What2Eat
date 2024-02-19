@@ -18,3 +18,4 @@ geopy==2.3.0
 sentence-transformers==2.2.2
 streamlit-chat==0.1.1
 scikit-learn==1.3.0
+streamlit_geolocation==0.0.10
