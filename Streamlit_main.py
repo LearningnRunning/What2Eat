@@ -1,6 +1,7 @@
 # from collections import Counter
 
 import folium
+from folium import plugins
 import pandas as pd
 import requests
 import streamlit as st
@@ -205,7 +206,7 @@ cat = {
 
 
 
-def main(df_diner, result_df_inner_join_bad, x, y, people_counts):
+def main(df_diner, result_df_inner_join_bad, x, y, radius_kilometers):
 
     
     # desired_df = df_diner.iloc[:,1:]
@@ -221,9 +222,18 @@ def main(df_diner, result_df_inner_join_bad, x, y, people_counts):
     m = folium.Map(location=[y, x], zoom_start=15)
     # Get the center coordinates
     # now_center = m.get_center()
-    
+
+    folium.CircleMarker(location=[y, x],
+        radius=7, color='blue', fill_color='#147DF5').add_to(m)
     
     marker_cluster = MarkerCluster().add_to(m)
+    # plugins.LocateControl().add_to(m)
+    
+    # folium.Marker(
+    #             [y, x],
+    #             icon=folium.Icon(color='blue', icon="user-circle", prefix='fa')
+    #             ).add_to(marker_cluster)
+    
     for diner_row_idx, diner_row in desired_df.iterrows():
         diner_idx = diner_row['diner_idx']
         # print(diner_idx, cnt)
@@ -281,7 +291,7 @@ def main(df_diner, result_df_inner_join_bad, x, y, people_counts):
                 [diner_row["diner_lat"], diner_row["diner_lon"]],
                 popup=popup,
                 tooltip=name,
-                icon=folium.Icon(color=color, icon="cloud", prefix='fa')
+                icon=folium.Icon(color=color, icon="cutlery", prefix='fa')
                 ).add_to(marker_cluster)
 
 
@@ -458,7 +468,7 @@ elif name == "What2Eat":
                 # st.components.html(desired_df.to_html(escape=False), scrolling=True)
                 # st.markdown(desired_df.sort_values('real_review_cnt', ascending=False).to_html(render_links=True),unsafe_allow_html=True)
                 
-                main(desired_df, result_df_inner_join_bad, user_lon, user_lat, people_counts)
+                main(desired_df, result_df_inner_join_bad, user_lon, user_lat, radius_kilometers)
                 # people_counts = st.slider('깐깐한 리뷰어 몇 명이상의 식당만 표시할까요?', 1, 50, 4)
             else:
                 st.write('### 아쉽지만 기준에 맞는 맛집이 없네요...')
