@@ -197,12 +197,35 @@ if user_lat is not None or user_lon is not None:
                 seleted_category = st.multiselect("세부 카테고리", unique_categories, default=unique_categories)
                 desired_df = desired_df[desired_df['diner_category_small'].isin(seleted_category)]
                 # Assuming your data is stored in a DataFrame called 'df'
-                desired_df['combined_categories'] = desired_df['diner_category_small'] + ' / ' + desired_df['diner_category_detail']
+                # desired_df['combined_categories'] = desired_df['diner_category_small'] + ' / ' + str(desired_df['diner_category_detail'])
                 
                 if seleted_category:
-                    st.dataframe(desired_df)
-                
+                    # st.dataframe(desired_df)
+                    introduction = ""
+                    for index, row in desired_df.iterrows():
+                        diner_name = row['diner_name']
+                        diner_category_small = row['diner_category_small']
+                        diner_url = row['diner_url']
+                        real_review_cnt = row['real_review_cnt']
+                        distance = row['distance']
+                        
+                        # Create Markdown-formatted introduction
+                        introduction += f"[{diner_name}]({diner_url})"
+                        if diner_name:
+                            introduction += f" ({diner_category_small})\n"
+                        else:
+                            introduction += "\n"
+                            
+                        introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n\n"
+                        # {int(distance*1000)}M 거리에 있습니다.
+                        # introduction += f"[카카오맵 바로가기]({diner_url})\n"
+                    # result_msg = "[캐럿](https://carat.im/)"
+                    message(introduction, avatar_style="adventurer-neutral", seed=100)
                 chat_result = f""
+                
+#                 마크다운 형식을오 
+# 한 row에서 
+# f"{real_review_cnt}개의 쩝쩝박사가 선택한  \n [diner_name](diner_url)
 # if user_input:
 #     embedding = model.encode(user_input)
 
