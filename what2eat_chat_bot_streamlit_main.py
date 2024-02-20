@@ -109,11 +109,8 @@ df_diner.columns = columns_name
 df_diner.reset_index(inplace=True)  # Resetting index and making changes in-place
 df_diner.rename(columns={'index': 'diner_idx'}, inplace=True)  # Renaming the index column to diner_idx
 
-
-st.header('What2Eat')
-
 BannerImage = Image.open('./img_data/what2eat-logo.png')
-
+st.image(BannerImage)
 st.sidebar.header("오늘 뭐 먹?")
 name = st.sidebar.radio("Menu", ["What2Eat Chats", "What2Eat Maps"])
 
@@ -130,7 +127,7 @@ if 'past' not in st.session_state:
 #     user_input = st.chat_input(placeholder="Your message")
 #     submitted = st.form_submit_button('전송')
 
-user_input = st.chat_input(placeholder="머먹?")
+# user_input = st.chat_input(placeholder="머먹?")
 
 # # 인원수 입력
 # # TODO:인원 값 피처엔지니어링 하기
