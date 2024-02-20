@@ -111,8 +111,8 @@ df_diner.rename(columns={'index': 'diner_idx'}, inplace=True)  # Renaming the in
 
 BannerImage = Image.open('./img_data/what2eat-logo.png')
 st.image(BannerImage)
-st.sidebar.header("오늘 뭐 먹?")
-name = st.sidebar.radio("Menu", ["What2Eat Chats", "What2Eat Maps"])
+# st.sidebar.header("오늘 뭐 먹?")
+# name = st.sidebar.radio("Menu", ["What2Eat Chats", "What2Eat Maps"])
 
 message("안녕하세요! 맛집을 찾으시나요? \n 아래 버튼을 클릭해주세요.", avatar_style="adventurer-neutral", seed=100)
 # # st.markdown("[❤️빵형의 개발도상국](https://www.youtube.com/c/빵형의개발도상국)")
