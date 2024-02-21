@@ -123,7 +123,7 @@ df_diner.reset_index(inplace=True)  # Resetting index and making changes in-plac
 df_diner.rename(columns={'index': 'diner_idx'}, inplace=True)  # Renaming the index column to diner_idx
 
 BannerImage = Image.open('./img_data/what2eat-logo.png')
-# st.image(BannerImage)
+st.image(BannerImage)
 # st.sidebar.header("오늘 뭐 먹?")
 # name = st.sidebar.radio("Menu", ["What2Eat Chats", "What2Eat Maps"])
 
