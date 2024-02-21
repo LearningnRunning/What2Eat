@@ -5,8 +5,10 @@ from geopy.geocoders import Nominatim
 
 import pandas as pd
 from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
+# from sklearn.metrics.pairwise import cosine_similarity
 from math import radians, sin, cos, sqrt, atan2
+import random
+import string
 import json
 from PIL import Image
 
@@ -79,11 +81,20 @@ def haversine(lat1, lon1, lat2, lon2):
 
     return distance
 
+def generate_user_agent():
+    # Generate a random string of letters and digits
+    random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+    # Concatenate with a prefix to ensure it's a valid user_agent format
+    user_agent = f"What2Eat_{random_string}"
+    return user_agent
+
 # 주소를 넣으면 위도, 경도 생성
 def geocode(longitude, latitude):
     # longitude, latitude = 126.962101108891, 37.5512831039192
     # address_gu = "마포구"
-    geolocator = Nominatim(user_agent="What2Eat")
+    user_agent = generate_user_agent()
+    
+    geolocator = Nominatim(user_agent=user_agent)
     location = geolocator.reverse((latitude, longitude))
     
     address_components = location.raw['address']
