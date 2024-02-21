@@ -12,6 +12,12 @@ import string
 import json
 from PIL import Image
 
+# logo_color_lst = [
+#     ["FF7F00", "0000FF", "FFC0CB", "FF7F00", "0000FF", "FFC0CB", "FF0000", "000000"],
+#     ["FFFF00", "FFFFFF", "808080", "FFFFFF", "800080", "800080", "000000", "FF7F00"],
+#     ["8B4513", "F5F5DC", "FFC0CB", "000000", "0000FF", "008080", "808080", "FFFF00"]
+# ]
+
 logo_img_path = './img_data/what2eat-logo-middle.png'
 logo_small_img_path = './img_data/what2eat-logo-small.png'
 # 페이지 설정
