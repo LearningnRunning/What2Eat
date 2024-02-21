@@ -54,6 +54,14 @@ def load_excel_data():
     df_diner['diner_category_detail'].fillna('', inplace=True)
     return df_diner, df_review
 
+def my_chat_message(message_txt):
+    return message(message_txt, avatar_style="adventurer-neutral", seed=100)
+
+
+def your_chat_message(message_txt):
+    return message(message_txt, avatar_style="adventurer-neutral", seed=100)
+
+
 def haversine(lat1, lon1, lat2, lon2):
     """
     Calculate the great circle distance between two points
@@ -80,8 +88,13 @@ def geocode(longitude, latitude):
     
     address_components = location.raw['address']
     print(address_components)
+    
+    
     if 'man_made' in address_components:
-        return '아직 당신의 위치를 파악할 수 없어요! \n 버튼을 클릭 해주세요!'
+        return '너 어딨어!!! \n 위에 버튼을 눌러봐'
+    elif address_components['city'] not in ['서울특별시']:
+        return '미안해.. 아직 서울만 돼....'
+    
     else:
         
         # Extract specific parts of the address
@@ -96,7 +109,7 @@ def geocode(longitude, latitude):
             suburb = ''
 
         # Print the desired address parts
-        return f"{neighbourhood} {suburb}에 있으시군요!"
+        return f"{neighbourhood} {suburb}에 있구나!"
         
 # model = cached_model()
 # df = get_dataset()
@@ -110,11 +123,11 @@ df_diner.reset_index(inplace=True)  # Resetting index and making changes in-plac
 df_diner.rename(columns={'index': 'diner_idx'}, inplace=True)  # Renaming the index column to diner_idx
 
 BannerImage = Image.open('./img_data/what2eat-logo.png')
-st.image(BannerImage)
+# st.image(BannerImage)
 # st.sidebar.header("오늘 뭐 먹?")
 # name = st.sidebar.radio("Menu", ["What2Eat Chats", "What2Eat Maps"])
 
-message("안녕하세요! 맛집을 찾으시나요? \n 아래 버튼을 클릭해주세요.", avatar_style="adventurer-neutral", seed=100)
+my_chat_message("안녕! 오늘 머먹?")
 # # st.markdown("[❤️빵형의 개발도상국](https://www.youtube.com/c/빵형의개발도상국)")
 
 if 'generated' not in st.session_state:
@@ -141,13 +154,13 @@ if 'past' not in st.session_state:
 location = streamlit_geolocation()
 user_lat, user_lon = location['latitude'], location['longitude']
 user_address = geocode(user_lon, user_lat)
-message(user_address, avatar_style="adventurer-neutral", seed=100)
+my_chat_message(user_address)
 
 if user_lat is not None or user_lon is not None:
-    message("어느 정도 근처의 맛집을 찾으시나요?", avatar_style="adventurer-neutral", seed=100)
+    my_chat_message("어디까지 갈겨?")
 
     # Select radius distance
-    radius_distance = st.selectbox("반경 거리를 골라주세요.", ["300m", "500m", "1km", "3km"])
+    radius_distance = st.selectbox("", ["300m", "500m", "1km", "3km"])
 
     # Convert radius distance to meters
     if radius_distance == "300m":
@@ -164,12 +177,12 @@ if user_lat is not None or user_lon is not None:
     df_filtered = df_diner[df_diner['distance'] <= radius_kilometers]
     
     if len(df_filtered):
-        message("어떤 메뉴가 당기나요?", avatar_style="adventurer-neutral", seed=100)
-        # message("", avatar_style="adventurer-neutral", seed=100)
+        my_chat_message("뭐 먹을겨?")
+        # my_chat_message("")
         # Filter out categories and convert float values to strings
         diner_category_lst = sorted([str(category) for category in set(df_filtered['diner_category_middle'].dropna().to_list()) if str(category) != '음식점'])
 
-        diner_category = st.multiselect("솔직한 리뷰어들이 긍정적으로 평가한 음식점 카테고리입니다.", diner_category_lst)
+        diner_category = st.multiselect("", diner_category_lst)
 
         people_counts = 5
         if bool(diner_category):
@@ -191,7 +204,7 @@ if user_lat is not None or user_lon is not None:
                 # Assuming your data is stored in a DataFrame called 'df'
                 unique_categories = desired_df['diner_category_small'].unique().tolist()           
                 
-                message("세부 카테고리에서 안 당기는 건 빼!", avatar_style="adventurer-neutral", seed=100)
+                my_chat_message("세부 업종에서 안 당기는 건 빼!")
                 
                 # Create a multi-select radio button
                 seleted_category = st.multiselect("세부 카테고리", unique_categories, default=unique_categories)
@@ -199,7 +212,9 @@ if user_lat is not None or user_lon is not None:
                 # Assuming your data is stored in a DataFrame called 'df'
                 # desired_df['combined_categories'] = desired_df['diner_category_small'] + ' / ' + str(desired_df['diner_category_detail'])
                 
-                if seleted_category:
+                if not len(desired_df):
+                    my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐")
+                elif seleted_category:
                     # st.dataframe(desired_df)
                     introduction = ""
                     for index, row in desired_df.iterrows():
@@ -207,7 +222,7 @@ if user_lat is not None or user_lon is not None:
                         diner_category_small = row['diner_category_small']
                         diner_url = row['diner_url']
                         real_review_cnt = row['real_review_cnt']
-                        distance = row['distance']
+                        distance = int(row['distance']*1000)
                         
                         # Create Markdown-formatted introduction
                         introduction += f"[{diner_name}]({diner_url})"
@@ -216,11 +231,16 @@ if user_lat is not None or user_lon is not None:
                         else:
                             introduction += "\n"
                             
-                        introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n\n"
+                        introduction += f"쩝쩝박사 {real_review_cnt}명 인증"
+                        
+                        if radius_kilometers >= 1:
+                            introduction += f"\n{distance}M \n\n"
+                        else:
+                            introduction += "\n\n"
                         # {int(distance*1000)}M 거리에 있습니다.
                         # introduction += f"[카카오맵 바로가기]({diner_url})\n"
                     # result_msg = "[캐럿](https://carat.im/)"
-                    message(introduction, avatar_style="adventurer-neutral", seed=100)
+                    my_chat_message(introduction)
                 chat_result = f""
                 
 #                 마크다운 형식을오 
