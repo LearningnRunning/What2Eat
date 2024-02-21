@@ -12,6 +12,15 @@ import string
 import json
 from PIL import Image
 
+logo_img_path = './img_data/what2eat-logo-middle.png'
+logo_small_img_path = './img_data/what2eat-logo-small.png'
+# 페이지 설정
+st.set_page_config(
+    page_title="머먹?",
+    page_icon=logo_small_img_path,
+    layout="wide",
+)
+
 @st.cache_data()
 def cached_model():
     model = SentenceTransformer('jhgan/ko-sroberta-multitask')
@@ -133,8 +142,14 @@ df_diner.columns = columns_name
 df_diner.reset_index(inplace=True)  # Resetting index and making changes in-place
 df_diner.rename(columns={'index': 'diner_idx'}, inplace=True)  # Renaming the index column to diner_idx
 
-BannerImage = Image.open('./img_data/what2eat-logo.png')
+
+
+
+BannerImage = Image.open(logo_img_path)
 st.image(BannerImage)
+
+
+
 # st.sidebar.header("오늘 뭐 먹?")
 # name = st.sidebar.radio("Menu", ["What2Eat Chats", "What2Eat Maps"])
 
