@@ -39,13 +39,23 @@ def get_dataset():
     return df
 
 @st.cache_data
-def makingquery(diner_category, df_diner):
-    diner_review_avg = 3.5
+def category_filters(diner_category, df_diner):
+    category_filted_df = df_diner.query(f"diner_category_middle in @diner_category")
+    
+    diner_nearby_cnt = len(category_filted_df)
+    
+    return category_filted_df
+
+@st.cache_data
+def real_review_filters(df_diner):
+    
+    diner_review_avg = 3.2
     # Convert diner_review_avg to string for formatting
     diner_review_avg_str = str(diner_review_avg)
     # result_df = df_diner.query(f"(diner_category_middle == '{diner_category}')  and (diner_address_constituency == '{address_gu}') and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg <= {diner_review_avg})")
     # (diner_address_constituency in @address_gu)
-    result_df = df_diner.query(f"(diner_category_middle in @diner_category) and (diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg >= diner_review_avg)")
+    
+    result_df = df_diner.query(f"(diner_lon != 0)  and (diner_lat != 0) and (diner_review_avg >= diner_review_avg)")
     result_df_inner_join = pd.merge(df_review, result_df, on='diner_idx', how='inner')
     
     personalAverageScoreRow = 3.8
@@ -58,7 +68,7 @@ def makingquery(diner_category, df_diner):
     thisRestaurantScore = 1.5
     
     result_df_inner_join_bad = result_df_inner_join.query(f"(reviewer_avg >= {personalAverageScoreRow}) and (reviewer_review_score <= {thisRestaurantScore})")
-
+    
     return result_df_inner_join, result_df_inner_join_bad
 
 @st.cache_data
@@ -118,11 +128,15 @@ def geocode(longitude, latitude):
     
     if 'man_made' in address_components:
         return '너 어딨어!!! \n 위에 버튼을 눌러봐'
-    elif address_components['city'] not in ['서울특별시']:
+    elif address_components['city'] not in ['서울특별시', '과천시']:
         return '미안해.. 아직 서울만 돼....'
     
     else:
-        
+        if 'city' in address_components:
+            city_name = address_components['city']
+        else:
+            city_name = ''
+            
         # Extract specific parts of the address
         if 'borough' in address_components:
             neighbourhood = address_components['borough']
@@ -135,19 +149,23 @@ def geocode(longitude, latitude):
             suburb = ''
 
         # Print the desired address parts
-        return f"{neighbourhood} {suburb}에 있구나!"
+        return f"{city_name} {neighbourhood} {suburb}에 있구나!"
         
 # model = cached_model()
 # df = get_dataset()
 
 df_diner, df_review = load_excel_data()
+print(df_diner.info())
 
-columns_name = ['diner_name', 'diner_category_large', 'diner_category_middle', 'diner_category_small', 'diner_category_detail', 'diner_menu', 'diner_review_cnt', 'diner_review_avg', 'diner_review_tags', 'diner_address', 'diner_phone', 'diner_lat', 'diner_lon', 'diner_url', 'diner_open_time', 'diner_address_constituency', '']
-df_diner.columns = columns_name
-# Assuming df_diner is your DataFrame
-df_diner.reset_index(inplace=True)  # Resetting index and making changes in-place
+
+# columns_name = [
+#     'diner_name', 'diner_category_large', 'diner_category_middle', 'diner_category_small', 'diner_category_detail', 
+#     'diner_menu', 'diner_review_cnt', 'diner_review_avg', 'diner_review_tags', 'diner_address', 'diner_phone', 'diner_lat', 'diner_lon', 
+#     'diner_url', 'diner_open_time', 'diner_address_constituency', 'all_review_cnt', 'real_review_cnt', 'real_review_percent']
+# df_diner.columns = columns_name
+# # Assuming df_diner is your DataFrame
+# df_diner.reset_index(inplace=True)  # Resetting index and making changes in-place
 df_diner.rename(columns={'index': 'diner_idx'}, inplace=True)  # Renaming the index column to diner_idx
-
 
 
 
@@ -206,41 +224,38 @@ if user_lat is not None or user_lon is not None:
     
     # Calculate distance for each diner and filter rows within 1km radius
     df_diner['distance'] = df_diner.apply(lambda row: haversine(user_lat, user_lon, row['diner_lat'], row['diner_lon']), axis=1)
-    df_filtered = df_diner[df_diner['distance'] <= radius_kilometers]
+    df_geo_filtered = df_diner[df_diner['distance'] <= radius_kilometers]
+    people_counts = 5
     
-    if len(df_filtered):
+    if len(df_geo_filtered):
         my_chat_message("뭐 먹을겨?")
         # my_chat_message("")
         # Filter out categories and convert float values to strings
-        diner_category_lst = sorted([str(category) for category in set(df_filtered['diner_category_middle'].dropna().to_list()) if str(category) != '음식점'])
+        diner_category_lst = sorted([str(category) for category in set(df_geo_filtered['diner_category_middle'].dropna().to_list()) if str(category) != '음식점'])
 
         diner_category = st.multiselect("", diner_category_lst)
 
-        people_counts = 5
+   
         if bool(diner_category):
-            result_df_inner_join, result_df_inner_join_bad = makingquery(diner_category, df_filtered)
-
-            if len(result_df_inner_join) > people_counts:
-                
-                result_df_inner_join.dropna(subset=['diner_idx'], inplace=True)
-                # result_df_inner_join = result_df_inner_join.reset_index(drop=False)
-                # Calculate the row_counts
-                row_counts = result_df_inner_join.groupby('diner_idx').size()
-
-                # Filter the DataFrame based on the condition
-                desired_df = df_diner[df_diner['diner_idx'].map(row_counts) > 3]
-    
-                # Assign the row_counts values to the 'real_review_cnt' column
-                desired_df['real_review_cnt'] = desired_df['diner_idx'].map(row_counts)
-
-                # Assuming your data is stored in a DataFrame called 'df'
-                unique_categories = desired_df['diner_category_small'].unique().tolist()           
-                
+            df_geo_mid_catecory_filtered = category_filters(diner_category, df_geo_filtered)
+            
+            if len(df_geo_mid_catecory_filtered) > people_counts:
+            
                 my_chat_message("세부 업종에서 안 당기는 건 빼!")
+                # Assuming your data is stored in a DataFrame called 'df'
+                unique_categories = df_geo_mid_catecory_filtered['diner_category_small'].unique().tolist()   
                 
                 # Create a multi-select radio button
                 seleted_category = st.multiselect("세부 카테고리", unique_categories, default=unique_categories)
-                desired_df = desired_df[desired_df['diner_category_small'].isin(seleted_category)]
+                df_geo_small_catecory_filtered = df_geo_mid_catecory_filtered[df_geo_mid_catecory_filtered['diner_category_small'].isin(seleted_category)]
+
+                diner_nearby_cnt = len(df_geo_small_catecory_filtered)
+
+                diner_review_avg = 3.2
+                # Filter rows where real_review_cnt is not NaN
+                df_geo_small_catecory_filtered = df_geo_small_catecory_filtered[df_geo_small_catecory_filtered['real_review_cnt'].notna()]
+
+                desired_df = df_geo_small_catecory_filtered.query(f"(diner_review_avg >= diner_review_avg) and (real_review_cnt >= 5)")
                 # Assuming your data is stored in a DataFrame called 'df'
                 # desired_df['combined_categories'] = desired_df['diner_category_small'] + ' / ' + str(desired_df['diner_category_detail'])
                 
@@ -248,13 +263,14 @@ if user_lat is not None or user_lon is not None:
                     my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐")
                 elif seleted_category:
                     # st.dataframe(desired_df)
-                    introduction = ""
+                    introduction = f"{radius_distance} 근처 {diner_nearby_cnt}개의 맛집 중에 {len(desired_df)}개의 인증된 곳이 있음\n\n"
                     for index, row in desired_df.iterrows():
                         diner_name = row['diner_name']
                         diner_category_small = row['diner_category_small']
                         diner_url = row['diner_url']
                         real_review_cnt = row['real_review_cnt']
                         distance = int(row['distance']*1000)
+                        diner_percent = row['real_review_percent']
                         
                         # Create Markdown-formatted introduction
                         introduction += f"[{diner_name}]({diner_url})"
@@ -263,7 +279,7 @@ if user_lat is not None or user_lon is not None:
                         else:
                             introduction += "\n"
                             
-                        introduction += f"쩝쩝박사 {real_review_cnt}명 인증"
+                        introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n 쩝쩝 퍼센트: {diner_percent}%"
                         
                         if radius_kilometers >= 1:
                             introduction += f"\n{distance}M \n\n"
@@ -273,8 +289,10 @@ if user_lat is not None or user_lon is not None:
                         # introduction += f"[카카오맵 바로가기]({diner_url})\n"
                     # result_msg = "[캐럿](https://carat.im/)"
                     my_chat_message(introduction)
+
                 chat_result = f""
-                
+            else:
+                my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐")
 #                 마크다운 형식을오 
 # 한 row에서 
 # f"{real_review_cnt}개의 쩝쩝박사가 선택한  \n [diner_name](diner_url)
