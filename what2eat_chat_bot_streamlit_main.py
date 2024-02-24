@@ -153,9 +153,9 @@ def geocode(longitude, latitude):
         
 # model = cached_model()
 # df = get_dataset()
-
+diner_review_avg = 3.2
 df_diner, df_review = load_excel_data()
-print(df_diner.info())
+# print(df_diner.info())
 
 
 # columns_name = [
@@ -231,6 +231,10 @@ if user_lat is not None or user_lon is not None:
         my_chat_message("뭐 먹을겨?")
         # my_chat_message("")
         # Filter out categories and convert float values to strings
+        df_geo_filtered = df_geo_filtered[df_geo_filtered['real_good_review_cnt'].notna()]
+
+        df_geo_filtered = df_geo_filtered.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
+        
         diner_category_lst = sorted([str(category) for category in set(df_geo_filtered['diner_category_middle'].dropna().to_list()) if str(category) != '음식점'])
 
         diner_category = st.multiselect("", diner_category_lst)
@@ -251,40 +255,48 @@ if user_lat is not None or user_lon is not None:
 
                 diner_nearby_cnt = len(df_geo_small_catecory_filtered)
 
-                diner_review_avg = 3.2
+                
                 # Filter rows where real_review_cnt is not NaN
-                df_geo_small_catecory_filtered = df_geo_small_catecory_filtered[df_geo_small_catecory_filtered['real_review_cnt'].notna()]
+                # df_geo_small_catecory_filtered = df_geo_small_catecory_filtered[df_geo_small_catecory_filtered['real_review_cnt'].notna()]
 
-                desired_df = df_geo_small_catecory_filtered.query(f"(diner_review_avg >= diner_review_avg) and (real_review_cnt >= 5)")
+                # desired_df = df_geo_small_catecory_filtered.query(f"(diner_review_avg >= diner_review_avg) and (real_review_cnt >= 5)")
                 # Assuming your data is stored in a DataFrame called 'df'
                 # desired_df['combined_categories'] = desired_df['diner_category_small'] + ' / ' + str(desired_df['diner_category_detail'])
                 
-                if not len(desired_df):
+                if not len(df_geo_small_catecory_filtered):
                     my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐")
                 elif seleted_category:
-                    # st.dataframe(desired_df)
-                    introduction = f"{radius_distance} 근처 {diner_nearby_cnt}개의 맛집 중에 {len(desired_df)}개의 인증된 곳이 있음\n\n"
-                    for index, row in desired_df.iterrows():
+                    # st.dataframe(df_geo_small_catecory_filtered)
+                    introduction = f"{radius_distance} 근처 {diner_nearby_cnt}개의 맛집 중에 {len(df_geo_small_catecory_filtered)}개의 인증된 곳이 있음\n\n"
+                    for index, row in df_geo_small_catecory_filtered.iterrows():
                         diner_name = row['diner_name']
                         diner_category_small = row['diner_category_small']
                         diner_url = row['diner_url']
-                        real_review_cnt = row['real_review_cnt']
+                        real_review_cnt = row['real_good_review_cnt']
                         distance = int(row['distance']*1000)
-                        diner_percent = row['real_review_percent']
+                        diner_good_percent = row['real_good_review_percent']
+                        diner_bad_percent = row['real_bad_review_percent']
                         
                         # Create Markdown-formatted introduction
                         introduction += f"[{diner_name}]({diner_url})"
-                        if diner_name:
-                            introduction += f" ({diner_category_small})\n"
+                        if diner_bad_percent is not None and diner_bad_percent > 10:
+                            introduction += f"\n불호(비추)리뷰 비율이 {diner_bad_percent}%나 돼!"
+                            if radius_kilometers >= 1:
+                                introduction += f"\n{distance}M \n\n"
+                            else:
+                                introduction += "\n\n"
                         else:
-                            introduction += "\n"
+                            if diner_name:
+                                introduction += f" ({diner_category_small})\n"
+                            else:
+                                introduction += "\n"
+                                
+                            introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n 쩝쩝 퍼센트: {diner_good_percent}%"
                             
-                        introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n 쩝쩝 퍼센트: {diner_percent}%"
-                        
-                        if radius_kilometers >= 1:
-                            introduction += f"\n{distance}M \n\n"
-                        else:
-                            introduction += "\n\n"
+                            if radius_kilometers >= 1:
+                                introduction += f"\n{distance}M \n\n"
+                            else:
+                                introduction += "\n\n"
                         # {int(distance*1000)}M 거리에 있습니다.
                         # introduction += f"[카카오맵 바로가기]({diner_url})\n"
                     # result_msg = "[캐럿](https://carat.im/)"
