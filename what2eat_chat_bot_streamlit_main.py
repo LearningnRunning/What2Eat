@@ -128,7 +128,7 @@ def geocode(longitude, latitude):
     
     if 'man_made' in address_components:
         return '너 어딨어!!! \n 위에 버튼을 눌러봐'
-    elif address_components['city'] not in ['서울특별시', '과천시']:
+    elif address_components['city'] not in ['서울특별시', '과천시', '성남시']:
         return '미안해.. 아직 서울만 돼....'
     
     else:
@@ -203,6 +203,7 @@ if 'past' not in st.session_state:
 
 location = streamlit_geolocation()
 user_lat, user_lon = location['latitude'], location['longitude']
+user_lat, user_lon =  37.33981298, 127.10895569
 user_address = geocode(user_lon, user_lat)
 my_chat_message(user_address)
 
