@@ -203,7 +203,7 @@ if 'past' not in st.session_state:
 
 location = streamlit_geolocation()
 user_lat, user_lon = location['latitude'], location['longitude']
-user_lat, user_lon =  37.33981298, 127.10895569
+# user_lat, user_lon =  37.429246, 126.9874451
 user_address = geocode(user_lon, user_lat)
 my_chat_message(user_address)
 
@@ -211,7 +211,7 @@ if user_lat is not None or user_lon is not None:
     my_chat_message("어디까지 갈겨?")
 
     # Select radius distance
-    radius_distance = st.selectbox("", ["300m", "500m", "1km", "3km"])
+    radius_distance = st.selectbox("", ["300m", "500m", "1km", "3km", "10km"])
 
     # Convert radius distance to meters
     if radius_distance == "300m":
@@ -222,6 +222,8 @@ if user_lat is not None or user_lon is not None:
         radius_kilometers = 1
     elif radius_distance == "3km":
         radius_kilometers = 3
+    elif radius_distance == "10km":
+        radius_kilometers = 10
     
     # Calculate distance for each diner and filter rows within 1km radius
     df_diner['distance'] = df_diner.apply(lambda row: haversine(user_lat, user_lon, row['diner_lat'], row['diner_lon']), axis=1)
@@ -273,7 +275,7 @@ if user_lat is not None or user_lon is not None:
                         diner_name = row['diner_name']
                         diner_category_small = row['diner_category_small']
                         diner_url = row['diner_url']
-                        real_review_cnt = row['real_good_review_cnt']
+                        real_review_cnt = int(row['real_good_review_cnt'])
                         distance = int(row['distance']*1000)
                         diner_good_percent = row['real_good_review_percent']
                         diner_bad_percent = row['real_bad_review_percent']
@@ -306,6 +308,9 @@ if user_lat is not None or user_lon is not None:
                 chat_result = f""
             else:
                 my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐")
+    else:
+        my_chat_message("헉.. 거리를 더 넓혀봐, 주변엔 없대")
+                
 #                 마크다운 형식을오 
 # 한 row에서 
 # f"{real_review_cnt}개의 쩝쩝박사가 선택한  \n [diner_name](diner_url)
