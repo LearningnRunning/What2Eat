@@ -157,7 +157,6 @@ diner_review_avg = 3.2
 df_diner, df_review = load_excel_data()
 # print(df_diner.info())
 
-
 # columns_name = [
 #     'diner_name', 'diner_category_large', 'diner_category_middle', 'diner_category_small', 'diner_category_detail', 
 #     'diner_menu', 'diner_review_cnt', 'diner_review_avg', 'diner_review_tags', 'diner_address', 'diner_phone', 'diner_lat', 'diner_lon', 
@@ -203,7 +202,7 @@ if 'past' not in st.session_state:
 
 location = streamlit_geolocation()
 user_lat, user_lon = location['latitude'], location['longitude']
-# user_lat, user_lon =  37.429246, 126.9874451
+# user_lat, user_lon =  37.576056, 126.901389
 user_address = geocode(user_lon, user_lat)
 my_chat_message(user_address)
 
@@ -254,7 +253,7 @@ if user_lat is not None or user_lon is not None:
                 
                 # Create a multi-select radio button
                 seleted_category = st.multiselect("세부 카테고리", unique_categories, default=unique_categories)
-                df_geo_small_catecory_filtered = df_geo_mid_catecory_filtered[df_geo_mid_catecory_filtered['diner_category_small'].isin(seleted_category)]
+                df_geo_small_catecory_filtered = df_geo_mid_catecory_filtered[df_geo_mid_catecory_filtered['diner_category_small'].isin(seleted_category)].sort_values(by='real_good_review_percent', ascending=False)
 
                 diner_nearby_cnt = len(df_geo_small_catecory_filtered)
 
@@ -271,6 +270,8 @@ if user_lat is not None or user_lon is not None:
                 elif seleted_category:
                     # st.dataframe(df_geo_small_catecory_filtered)
                     introduction = f"{radius_distance} 근처 {diner_nearby_cnt}개의 맛집 중에 {len(df_geo_small_catecory_filtered)}개의 인증된 곳이 있음\n\n"
+                    
+                    
                     for index, row in df_geo_small_catecory_filtered.iterrows():
                         diner_name = row['diner_name']
                         diner_category_small = row['diner_category_small']
