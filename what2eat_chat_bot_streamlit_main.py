@@ -89,7 +89,7 @@ def your_chat_message(message_txt):
     return message(message_txt, avatar_style="adventurer-neutral", seed=100)
 
 
-def haversine(lat1, lon1, lon2, lat2):
+def haversine(lat1, lon1, lat2, lon2):
     """
     Calculate the great circle distance between two points
     on the earth (specified in decimal degrees)
@@ -223,13 +223,12 @@ if user_lat is not None or user_lon is not None:
         radius_kilometers = 3
     elif radius_distance == "10km":
         radius_kilometers = 10
-    
+
     # Calculate distance for each diner and filter rows within 1km radius
     df_diner['distance'] = df_diner.apply(lambda row: haversine(user_lat, user_lon, row['diner_lat'], row['diner_lon']), axis=1)
     df_geo_filtered = df_diner[df_diner['distance'] <= radius_kilometers]
     people_counts = 5
-    st.dataframe(df_geo_filtered)
-    
+
     if len(df_geo_filtered):
         my_chat_message("뭐 먹을겨?")
         # my_chat_message("")
