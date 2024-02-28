@@ -89,7 +89,7 @@ def your_chat_message(message_txt):
     return message(message_txt, avatar_style="adventurer-neutral", seed=100)
 
 
-def haversine(lat1, lon1, lat2, lon2):
+def haversine(lat1, lon1, lon2, lat2):
     """
     Calculate the great circle distance between two points
     on the earth (specified in decimal degrees)
@@ -202,7 +202,7 @@ if 'past' not in st.session_state:
 
 location = streamlit_geolocation()
 user_lat, user_lon = location['latitude'], location['longitude']
-# user_lat, user_lon =  37.576056, 126.901389
+user_lat, user_lon =  37.4202, 126.9911
 user_address = geocode(user_lon, user_lat)
 my_chat_message(user_address)
 
@@ -228,6 +228,7 @@ if user_lat is not None or user_lon is not None:
     df_diner['distance'] = df_diner.apply(lambda row: haversine(user_lat, user_lon, row['diner_lat'], row['diner_lon']), axis=1)
     df_geo_filtered = df_diner[df_diner['distance'] <= radius_kilometers]
     people_counts = 5
+    st.dataframe(df_geo_filtered)
     
     if len(df_geo_filtered):
         my_chat_message("뭐 먹을겨?")
@@ -241,7 +242,7 @@ if user_lat is not None or user_lon is not None:
 
         diner_category = st.multiselect("", diner_category_lst)
 
-   
+
         if bool(diner_category):
             df_geo_mid_catecory_filtered = category_filters(diner_category, df_geo_filtered)
             
