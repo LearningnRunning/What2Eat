@@ -202,7 +202,7 @@ if 'past' not in st.session_state:
 
 location = streamlit_geolocation()
 user_lat, user_lon = location['latitude'], location['longitude']
-user_lat, user_lon =  37.4202, 126.9911
+# user_lat, user_lon =  37.4202, 126.9911
 user_address = geocode(user_lon, user_lat)
 my_chat_message(user_address)
 
