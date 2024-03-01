@@ -236,13 +236,9 @@ if user_lat is not None or user_lon is not None:
         df_geo_filtered = df_geo_filtered[df_geo_filtered['real_good_review_cnt'].notna()]
 
         df_geo_filtered = df_geo_filtered.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
-        
-        st.dataframe(df_geo_filtered)
-        grouped_df = df_geo_filtered.groupby('diner_category_middle')
 
-        st.dataframe(grouped_df)
         diner_category_lst = sorted([str(category) for category in set(df_geo_filtered['diner_category_middle'].dropna().to_list()) if str(category) != '음식점'])
-        st.text(diner_category_lst)
+
         diner_category = st.multiselect("", diner_category_lst)
 
 
