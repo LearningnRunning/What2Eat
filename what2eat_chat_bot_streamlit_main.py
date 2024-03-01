@@ -41,7 +41,7 @@ def get_dataset():
 @st.cache_data
 def category_filters(diner_category, df_diner):
     category_filted_df = df_diner.query(f"diner_category_middle in @diner_category")
-    
+    st.dataframe(category_filted_df)
     diner_nearby_cnt = len(category_filted_df)
     
     return category_filted_df
@@ -237,15 +237,19 @@ if user_lat is not None or user_lon is not None:
 
         df_geo_filtered = df_geo_filtered.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
         
-        diner_category_lst = sorted([str(category) for category in set(df_geo_filtered['diner_category_middle'].dropna().to_list()) if str(category) != '음식점'])
+        st.dataframe(df_geo_filtered)
+        grouped_df = df_geo_filtered.groupby('diner_category_middle')
 
+        st.dataframe(grouped_df)
+        diner_category_lst = sorted([str(category) for category in set(df_geo_filtered['diner_category_middle'].dropna().to_list()) if str(category) != '음식점'])
+        st.text(diner_category_lst)
         diner_category = st.multiselect("", diner_category_lst)
 
 
         if bool(diner_category):
             df_geo_mid_catecory_filtered = category_filters(diner_category, df_geo_filtered)
             
-            if len(df_geo_mid_catecory_filtered) > people_counts:
+            if len(df_geo_mid_catecory_filtered):
             
                 my_chat_message("세부 업종에서 안 당기는 건 빼!")
                 # Assuming your data is stored in a DataFrame called 'df'
