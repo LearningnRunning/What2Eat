@@ -41,7 +41,7 @@ def get_dataset():
 @st.cache_data
 def category_filters(diner_category, df_diner):
     category_filted_df = df_diner.query(f"diner_category_middle in @diner_category")
-    st.dataframe(category_filted_df)
+
     diner_nearby_cnt = len(category_filted_df)
     
     return category_filted_df
