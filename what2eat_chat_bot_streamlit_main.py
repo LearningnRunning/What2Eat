@@ -283,7 +283,7 @@ if user_lat is not None or user_lon is not None:
                         introduction += f"[{diner_name}]({diner_url})"
                         if diner_bad_percent is not None and diner_bad_percent > 10:
                             introduction += f"\n불호(비추)리뷰 비율이 {diner_bad_percent}%나 돼!"
-                            if radius_kilometers >= 1:
+                            if radius_kilometers >= 0.5:
                                 introduction += f"\n{distance}M \n\n"
                             else:
                                 introduction += "\n\n"
@@ -295,7 +295,7 @@ if user_lat is not None or user_lon is not None:
                                 
                             introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n 쩝쩝 퍼센트: {diner_good_percent}%"
                             
-                            if radius_kilometers >= 1:
+                            if radius_kilometers >= 0.5:
                                 introduction += f"\n{distance}M \n\n"
                             else:
                                 introduction += "\n\n"
