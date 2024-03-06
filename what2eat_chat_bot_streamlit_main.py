@@ -39,12 +39,11 @@ def get_dataset():
     return df
 
 @st.cache_data
-def category_filters(diner_category, df_diner):
-    category_filted_df = df_diner.query(f"diner_category_middle in @diner_category")
-
-    diner_nearby_cnt = len(category_filted_df)
+def category_filters(diner_category, df_diner_real_review, df_diner):
+    category_filted_df = df_diner_real_review.query(f"diner_category_middle in @diner_category")
+    diner_nearby_cnt = len(df_diner.query(f"diner_category_middle in @diner_category"))
     
-    return category_filted_df
+    return category_filted_df, diner_nearby_cnt
 
 @st.cache_data
 def real_review_filters(df_diner):
@@ -235,15 +234,15 @@ if user_lat is not None or user_lon is not None:
         # Filter out categories and convert float values to strings
         df_geo_filtered = df_geo_filtered[df_geo_filtered['real_good_review_cnt'].notna()]
 
-        df_geo_filtered = df_geo_filtered.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
+        df_geo_filtered_real_review = df_geo_filtered.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
 
-        diner_category_lst = sorted([str(category) for category in set(df_geo_filtered['diner_category_middle'].dropna().to_list()) if str(category) != '음식점'])
+        diner_category_lst = sorted([str(category) for category in set(df_geo_filtered_real_review['diner_category_middle'].dropna().to_list()) if str(category) != '음식점'])
 
         diner_category = st.multiselect("", diner_category_lst)
 
 
         if bool(diner_category):
-            df_geo_mid_catecory_filtered = category_filters(diner_category, df_geo_filtered)
+            df_geo_mid_catecory_filtered, diner_nearby_cnt = category_filters(diner_category, df_geo_filtered_real_review, df_geo_filtered)
             
             if len(df_geo_mid_catecory_filtered):
             
@@ -255,7 +254,6 @@ if user_lat is not None or user_lon is not None:
                 seleted_category = st.multiselect("세부 카테고리", unique_categories, default=unique_categories)
                 df_geo_small_catecory_filtered = df_geo_mid_catecory_filtered[df_geo_mid_catecory_filtered['diner_category_small'].isin(seleted_category)].sort_values(by='real_good_review_percent', ascending=False)
 
-                diner_nearby_cnt = len(df_geo_small_catecory_filtered)
 
                 
                 # Filter rows where real_review_cnt is not NaN
@@ -269,7 +267,7 @@ if user_lat is not None or user_lon is not None:
                     my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐")
                 elif seleted_category:
                     # st.dataframe(df_geo_small_catecory_filtered)
-                    introduction = f"{radius_distance} 근처 {diner_nearby_cnt}개의 맛집 중에 {len(df_geo_small_catecory_filtered)}개의 인증된 곳이 있음\n\n"
+                    introduction = f"{radius_distance} 근처 \n {diner_nearby_cnt}개의 맛집 중에 {len(df_geo_small_catecory_filtered)}개의 인증된 곳 발견!\n\n"
                     
                     
                     for index, row in df_geo_small_catecory_filtered.iterrows():
