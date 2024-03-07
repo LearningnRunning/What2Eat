@@ -7,6 +7,11 @@ from awesome_package.module import (make_map, generate_user_agent, haversine,
                                     popup_html)
 
 from PIL import Image
+import ast
+def make_clickable_url(df):
+    name = df['diner_name']
+    url = df['diner_url']
+    return f'<a target="_blank" href="{url}">{name}</a>'
 
 
 BannerImage = Image.open('./img_data/what2eat-logo.png')
@@ -26,7 +31,6 @@ if name == "About us":
     st.image(BannerImage)
     st.write("# Hello, What2Eat World")
 
-    
     all_review_total_sum = int(df_diner['all_review_cnt'].dropna().sum())
     real_review_total_sum = int(df_diner['real_good_review_cnt'].dropna().sum())
     
@@ -102,7 +106,7 @@ elif name == "What2Eat":
                     
                     # Create a multi-select radio button
                     seleted_category = st.multiselect("세부 카테고리", unique_categories, default=unique_categories)
-                    df_geo_small_catecory_filtered = df_geo_mid_catecory_filtered[df_geo_mid_catecory_filtered['diner_category_small'].isin(seleted_category)].sort_values(by='real_good_review_percent', ascending=False)
+                    df_geo_small_catecory_filtered = df_geo_mid_catecory_filtered[df_geo_mid_catecory_filtered['diner_category_small'].isin(seleted_category)].sort_values(by='distance', ascending=True)
                     
                     if not len(df_geo_small_catecory_filtered):
                         st.write("헉.. 주변에 찐맛집이 없대요.. \n 다른 메뉴를 골라봐요")
@@ -110,11 +114,59 @@ elif name == "What2Eat":
                         # st.dataframe(df_geo_small_catecory_filtered)
                         result_map = make_map(df_geo_small_catecory_filtered, user_lon, user_lat)
                         st_data = folium_static(result_map, width=700, height=500)
+
+                        # df_geo_small_catecory_filtered['diner_clickable_url'] = df_geo_small_catecory_filtered.apply(make_clickable_url,  axis=1)
+                        # st.dataframe(df_geo_small_catecory_filtered)
+                        df_geo_small_catecory_filtered = df_geo_small_catecory_filtered[['distance', 'real_good_review_percent', 'real_good_review_cnt','diner_name', 'diner_url', 'diner_phone', 'diner_category_small', 'diner_menu']]
+
+                        
+                        st.data_editor(
+                            df_geo_small_catecory_filtered,
+                            column_config = {
+                                'diner_url' : st.column_config.LinkColumn(
+                                    '카카오맵',
+                                    validate="^http://place.map.kakao.com/",
+                                    display_text='바로가기',
+                                    width = 'small'
+                                ),
+                                'distance' : st.column_config.NumberColumn(
+                                    '도달 거리',
+                                    default = 'float',
+                                    format='%.1f Km'
+                                ),
+                                'real_good_review_percent' : st.column_config.NumberColumn(
+                                    '인증 %',
+                                    default = 'float',
+                                    format = '%.1f'
+                                ),
+                                'real_good_review_cnt' : st.column_config.NumberColumn(
+                                    '인증 리뷰 수',
+                                    default = 'int',
+                                    format = '%d 개',
+                                    width= 'small'
+                                ),
+                                'diner_name' : st.column_config.TextColumn(
+                                    '상호명'
+                                ),
+                                'diner_menu' : st.column_config.ListColumn(
+                                    '메뉴',
+                                    width= 'medium'
+                                ),
+                                'diner_category_small' : st.column_config.TextColumn(
+                                    '업종',
+                                ),
+                                'diner_phone' : st.column_config.LinkColumn(
+                                    '번호'
+                                )
+                            }
+                        )
+                        # st.markdown(df_geo_small_catecory_filtered.to_html(render_links=True),unsafe_allow_html=True)
+                        # st.dataframe(df_geo_small_catecory_filtered.style.format({'nameurl': make_clickable_both}))
                         
                         # result_map.on_move(print_map_center)
                         # new_location = result_map.location
                         # new_lat, new_lon = new_location[0], new_location[1]
-                        
+
                         # if [user_lat, user_lon] == new_location:
                         #     st_data = folium_static(result_map, width=700, height=500)
                         # else:

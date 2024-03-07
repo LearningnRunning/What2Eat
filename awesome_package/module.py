@@ -12,6 +12,7 @@ from math import radians, sin, cos, sqrt, atan2
 import random
 import string
 import json
+import ast
 from PIL import Image
 
 
@@ -23,6 +24,7 @@ def load_excel_data():
     df_diner = pd.read_csv('./seoul_data/whatToEat_DB_seoul_diner.csv')
     # df_review = pd.read_csv('./seoul_data/whatToEat_DB_seoul_review.csv')
     df_diner['diner_category_detail'].fillna('', inplace=True)
+    df_diner["diner_menu"] = df_diner["diner_menu"].apply(ast.literal_eval)
     return df_diner
 
 
@@ -128,7 +130,7 @@ def generate_user_agent():
 
 
 # 지도에 Pop시 정보창 생성
-def popup_html(diner_row, linke_tags, menu, unlike):
+def popup_html(diner_row, linke_tags, unlike):
     diner_name = diner_row['diner_name']
     diner_category_small = diner_row['diner_category_small']
     diner_url = diner_row['diner_url']
@@ -228,22 +230,22 @@ def make_map(desired_df, x, y):
             color = 'gray'
             unlike = "</br> 다만, 불호가 너무 많은 식당입니다. 불호 퍼센트 : {}".format(diner_bad_percent)
 
-        if diner_menu is not None:
-            menu_tmp = diner_menu
-            if menu_tmp.find('['):
-                menu_list = [" ".join(i.split("\n")[:2]) for i in menu_tmp.replace('[','').replace('[','').split(', ') if len(i)]
-                menu = "\n".join(menu_list)
-            elif menu_tmp.find('->'):
-                menu_list =[" ".join(i.split("\n")[:2]) for i in menu_tmp.replace('가격:', '').split('->')]
-                menu = "\n".join(menu_list)
-            elif len(menu_tmp):
-                menu = "".join(menu_tmp.replace('[','').replace('[','').split(', '))
-            else:
-                menu = "메뉴정보가 없는 음식점입니다."
+        # if diner_menu is not None:
+        #     menu_tmp = diner_menu
+        #     if menu_tmp.find('['):
+        #         menu_list = [" ".join(i.split("\n")[:2]) for i in menu_tmp.replace('[','').replace('[','').split(', ') if len(i)]
+        #         menu = "\n".join(menu_list)
+        #     elif menu_tmp.find('->'):
+        #         menu_list =[" ".join(i.split("\n")[:2]) for i in menu_tmp.replace('가격:', '').split('->')]
+        #         menu = "\n".join(menu_list)
+        #     elif len(menu_tmp):
+        #         menu = "".join(menu_tmp.replace('[','').replace('[','').split(', '))
+        #     else:
+        #         menu = "메뉴정보가 없는 음식점입니다."
                 
-        if len(menu) >= 120:
-            menu = menu[:120] 
-        html = popup_html(diner_row, diner_tags, menu, unlike)
+        # if len(menu) >= 120:
+        #     menu = menu[:120] 
+        html = popup_html(diner_row, diner_tags, unlike)
         # iframe = branca.element.IFrame(html=html,width=510,height=280)
         popup = folium.Popup(folium.Html(html, script=True), max_width=500)
         
