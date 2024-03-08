@@ -76,7 +76,7 @@ elif name == "What2Eat":
         elif radius_distance == "10km":
             radius_kilometers = 10
         
-        radius_kilometers = 50
+        radius_kilometers = 10
         # Calculate distance for each diner and filter rows within 1km radius
         df_diner['distance'] = df_diner.apply(lambda row: haversine(user_lat, user_lon, row['diner_lat'], row['diner_lon']), axis=1)
         df_geo_filtered = df_diner[df_diner['distance'] <= radius_kilometers]
