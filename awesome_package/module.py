@@ -74,22 +74,22 @@ def geocode(longitude, latitude):
     
     if 'man_made' in address_components:
         return '너 어딨어!!! \n 위에 버튼을 눌러봐 \n 그리고 위치 허용 해야함 ㅠ'
-    elif address_components['city'] not in ['서울특별시', '과천시', '성남시']:
+    elif address_components.get('city') not in ['서울특별시', '과천시', '성남시']:
         return '미안해.. 아직 서울만 돼....'
     
     else:
         if 'city' in address_components:
-            city_name = address_components['city']
+            city_name = address_components.get('city')
         else:
             city_name = ''
             
         if 'borough' in address_components:
-            neighbourhood = address_components['borough']
+            neighbourhood = address_components.get('borough')
         else:
             neighbourhood = ''
 
         if 'suburb' in address_components:
-            suburb = address_components['suburb']
+            suburb = address_components.get('suburb')
         else:
             suburb = ''
 
