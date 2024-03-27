@@ -68,13 +68,13 @@ def geocode(longitude, latitude):
     user_agent = generate_user_agent()
     
     geolocator = Nominatim(user_agent=user_agent)
+    # deplot_latitude, deplot_longitude = 37.5074423, 127.0567474
     location = geolocator.reverse((latitude, longitude))
-    
+    print(location)
     address_components = location.raw['address']
     
-    if 'man_made' in address_components:
-        return '너 어딨어!!! \n 위에 버튼을 눌러봐 \n 그리고 위치 허용 해야함 ㅠ'
-    elif address_components.get('city') not in ['서울특별시', '과천시', '성남시']:
+
+    if address_components.get('city') not in ['서울특별시', '과천시', '성남시']:
         return '미안해.. 아직 서울만 돼....'
     
     else:
