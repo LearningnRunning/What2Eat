@@ -21,7 +21,7 @@ def load_excel_data():
     # Load the Excel data and create the DataFrame
     # df_diner = pd.read_csv('./seoul_data/whatToEat_DB_seoul_diner.csv', index_col=0)
     # df_review = pd.read_csv('./seoul_data/whatToEat_DB_seoul_review.csv', index_col=0)
-    df_diner = pd.read_csv('./seoul_data/whatToEat_DB_seoul_diner.csv')
+    df_diner = pd.read_csv('./seoul_data/whatToEat_DB_seoul_diner_20240712.csv')
     # df_review = pd.read_csv('./seoul_data/whatToEat_DB_seoul_review.csv')
     df_diner['diner_category_detail'].fillna('', inplace=True)
     df_diner["diner_menu"] = df_diner["diner_menu"].apply(ast.literal_eval)
@@ -98,7 +98,7 @@ def geocode(longitude, latitude):
 def generate_introduction(diner_name, diner_url, diner_bad_percent, radius_kilometers, distance, diner_category_small, real_review_cnt, diner_good_percent):
     introduction = f"[{diner_name}]({diner_url})"
     if diner_bad_percent is not None and diner_bad_percent > 10:
-        introduction += f"\n불호(비추)리뷰 비율이 {diner_bad_percent}%나 돼!"
+        introduction += f"\n불호(비추)리뷰 비율이 {round(diner_bad_percent, 2)}%나 돼!"
         if radius_kilometers >= 0.5:
             introduction += f"\n{distance}M \n\n"
         else:
@@ -109,7 +109,7 @@ def generate_introduction(diner_name, diner_url, diner_bad_percent, radius_kilom
         else:
             introduction += "\n"
                             
-        introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n 쩝쩝 퍼센트: {diner_good_percent}%"
+        introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n 쩝쩝 퍼센트: {round(diner_good_percent,2)}%"
                             
         if radius_kilometers >= 0.5:
             introduction += f"\n{distance}M \n\n"
@@ -228,7 +228,7 @@ def make_map(desired_df, x, y):
         
         if diner_bad_percent > 10:
             color = 'gray'
-            unlike = "</br> 다만, 불호가 너무 많은 식당입니다. 불호 퍼센트 : {}".format(diner_bad_percent)
+            unlike = "</br> 다만, 불호가 너무 많은 식당입니다. 불호 퍼센트 : {}".format(round(diner_bad_percent, 2))
 
         # if diner_menu is not None:
         #     menu_tmp = diner_menu
