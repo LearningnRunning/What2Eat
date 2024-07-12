@@ -9,6 +9,7 @@ from PIL import Image
 
 logo_img_path = './img_data/what2eat-logo-middle.png'
 logo_small_img_path = './img_data/what2eat-logo-small.png'
+logo_title_img_path = './img_data/what2eat-word-logo-small.png'
 diner_review_avg = 3.2
 
 # 페이지 설정
@@ -19,12 +20,14 @@ st.set_page_config(
 )
 
 
-df_diner = load_excel_data()
+df_diner, banner_image, icon_image = load_excel_data(logo_img_path, logo_small_img_path)
 df_diner.rename(columns={'index': 'diner_idx'}, inplace=True)  # Renaming the index column to diner_idx
 
 
-BannerImage = Image.open(logo_img_path)
-st.image(BannerImage)
+"안녕! "
+
+st.logo(banner_image, icon_image=icon_image)
+# st.image(banner_image)
 
 avatar_style, seed = choice_avatar()
 
