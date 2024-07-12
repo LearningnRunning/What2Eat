@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 
-df_diner, banner_image, icon_image = load_excel_data(logo_img_path, logo_small_img_path)
+df_diner, banner_image, icon_image = load_excel_data(logo_img_path, logo_title_img_path)
 df_diner.rename(columns={'index': 'diner_idx'}, inplace=True)  # Renaming the index column to diner_idx
 
 st.logo(banner_image, icon_image=icon_image)
