@@ -2,7 +2,7 @@ import streamlit as st
 from streamlit_geolocation import streamlit_geolocation
 from awesome_package.module import (my_chat_message, choice_avatar, haversine,
                                     geocode, load_excel_data, category_filters,
-                                    generate_introduction)
+                                    generate_introduction, search_your_address)
 
 from PIL import Image
 
@@ -32,7 +32,6 @@ avatar_style, seed = choice_avatar()
 # name = st.sidebar.radio("Menu", ["What2Eat Chats", "What2Eat Maps"])
 
 my_chat_message("안녕! 오늘 머먹?", avatar_style, seed)
-# # st.markdown("[❤️빵형의 개발도상국](https://www.youtube.com/c/빵형의개발도상국)")
 
 if 'generated' not in st.session_state:
     st.session_state['generated'] = []
@@ -45,15 +44,46 @@ if 'past' not in st.session_state:
 # num_people = st.number_input("몇 명이서 식사하시나요?", min_value=1, value=1)
 
 
-location = streamlit_geolocation()
-print('location', location)
-user_lat, user_lon = location['latitude'], location['longitude']
-print('user_lat, user_lon', user_lat, user_lon)
-if user_lat is None or user_lon is None:
-    user_lat, user_lon = 37.5074423, 127.0567474
-    user_address = '강남구 삼성동 \n 너 여기 맞아?!! 위에 버튼을 눌러봐 \n 그리고 위치 허용 해야함 ㅠ'
+# location = streamlit_geolocation()
+# print('location', location)
+# user_lat, user_lon = location['latitude'], location['longitude']
+# print('user_lat, user_lon', user_lat, user_lon)
+# if user_lat is None or user_lon is None:
+#     user_lat, user_lon = 37.5074423, 127.0567474
+#     user_address = '강남구 삼성동 \n 너 여기 맞아?!! 위에 버튼을 눌러봐 \n 그리고 위치 허용 해야함 ㅠ'
+# else:
+#     user_address = geocode(user_lon, user_lat)
+default_address_info_list = ["강남구 삼성동", 127.0567474, 37.5074423]
+
+# Streamlit 앱의 시작 부분에 위치 초기화
+if "user_lat" not in st.session_state or "user_lon" not in st.session_state:
+    st.session_state.user_lat, st.session_state.user_lon = default_address_info_list[2], default_address_info_list[1]
+
+if "address" not in st.session_state:
+    st.session_state.address = default_address_info_list[0]
+
+# 사용자에게 위치를 선택하도록 옵션 제공
+option = st.radio("위치를 선택하세요", ('주변에서 찾기', '주소 검색으로 찾기'))
+
+if option == '주변에서 찾기':
+    location = streamlit_geolocation()
+    print('location', location)
+    if location['latitude'] is not None or location['longitude'] is not None:
+        st.session_state.user_lat, st.session_state.user_lon = location['latitude'], location['longitude']
+        st.session_state.address = geocode(st.session_state.user_lon, st.session_state.user_lat)
+    else:
+        st.session_state.address = default_address_info_list[0]
+
+elif option == '주소 검색으로 찾기':
+    search_your_address()
+
+user_lat, user_lon = st.session_state.user_lat, st.session_state.user_lon
+
+if user_lat == 37.5074423 and user_lon == 127.0567474:
+    user_address = "너의 위치를 정확히 파악하기 위해 위 버튼을 눌러 위치 공유를 해줘!"
 else:
-    user_address = geocode(user_lon, user_lat)
+    user_address = f"{st.session_state.address} 주변이구나!"
+
 my_chat_message(user_address, avatar_style, seed)
 
 

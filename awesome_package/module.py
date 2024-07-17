@@ -1,4 +1,7 @@
 import streamlit as st
+import folium
+from streamlit_folium import st_folium
+
 from streamlit_geolocation import streamlit_geolocation
 from streamlit_chat import message
 from geopy.geocoders import Nominatim
@@ -12,8 +15,17 @@ from math import radians, sin, cos, sqrt, atan2
 import random
 import string
 import json
+import requests
 import ast
 from PIL import Image
+
+
+
+# 요청 URL 및 헤더 설정
+url = "https://dapi.kakao.com/v2/local/search/keyword.json"
+headers = {
+    "Authorization": f"KakaoAK {st.secrets['REST_API_KEY']}"
+}
 
 
 @st.cache_data
@@ -32,6 +44,33 @@ def load_excel_data(logo_img_path, logo_small_img_path):
     return df_diner, banner_image, icon_image
 
 
+def search_your_address():
+    search_region_text = st.text_input("주소나 키워드로 입력해줘")
+    if st.button("검색"):
+        params = {
+            "query": search_region_text,
+            # 'analyze_type': 'similar',
+            'size': 1
+        }
+
+        response = requests.get(url, headers=headers, params=params)
+
+        if response.status_code == 200:
+            response_json = response.json()
+            response_doc_list = response_json['documents']
+            if response_doc_list:
+                response_doc = response_doc_list[0]
+                address_info_list = [response_doc['address_name'], (float(response_doc['x']), float(response_doc['y']))]
+                st.session_state.address = address_info_list[0]
+                st.session_state.user_lat, st.session_state.user_lon = address_info_list[1][1], address_info_list[1][0]
+                st.experimental_rerun()
+            else:
+                st.write('다른 검색어를 입력해봐... 먄')
+                
+        else:
+            st.write('다른 검색어를 입력해봐... 먄')
+        
+        
 @st.cache_data
 def category_filters(diner_category, df_diner_real_review, df_diner):
     category_filted_df = df_diner_real_review.query(f"diner_category_middle in @diner_category")
