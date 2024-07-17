@@ -79,8 +79,10 @@ elif option == '주소 검색으로 찾기':
 
 user_lat, user_lon = st.session_state.user_lat, st.session_state.user_lon
 
-if user_lat == 37.5074423 and user_lon == 127.0567474:
+if (user_lat == 37.5074423 and user_lon == 127.0567474) and option == '주변에서 찾기':
     user_address = "너의 위치를 정확히 파악하기 위해 위 버튼을 눌러 위치 공유를 해줘!"
+elif (user_lat == 37.5074423 and user_lon == 127.0567474) and option == '주소 검색으로 찾기':
+    user_address = "너의 위치를 정확히 파악하기 위해 위 검색을 통해 너의 위치 공유를 해줘!"
 else:
     user_address = f"{st.session_state.address} 주변이구나!"
 
