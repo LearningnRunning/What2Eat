@@ -30,8 +30,10 @@ avatar_style, seed = choice_avatar()
 
 # st.sidebar.header("오늘 뭐 먹?")
 # name = st.sidebar.radio("Menu", ["What2Eat Chats", "What2Eat Maps"])
+ai_what2eat_mention = "잠깐! AI 머먹을 시험 시행 중이야 한번 써볼래? \n [AI 머먹 이용하기](https://laas.wanted.co.kr/sandbox/share?project=PROMPTHON_PRJ_463&hash=f11097aa25dde2ef411ac331f47c1a3d1199331e8c4d10adebd7750576f442ff)"
 
 my_chat_message("안녕! 오늘 머먹?", avatar_style, seed)
+my_chat_message(ai_what2eat_mention, avatar_style, seed)
 
 if 'generated' not in st.session_state:
     st.session_state['generated'] = []
