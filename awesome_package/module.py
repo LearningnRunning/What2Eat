@@ -33,7 +33,7 @@ def load_excel_data(logo_img_path, logo_small_img_path):
     # Load the Excel data and create the DataFrame
     # df_diner = pd.read_csv('./seoul_data/whatToEat_DB_seoul_diner.csv', index_col=0)
     # df_review = pd.read_csv('./seoul_data/whatToEat_DB_seoul_review.csv', index_col=0)
-    df_diner = pd.read_csv('./seoul_data/whatToEat_DB_seoul_diner_20240712.csv')
+    df_diner = pd.read_csv('./seoul_data/whatToEat_DB_seoul_diner_202400816.csv')
     # df_review = pd.read_csv('./seoul_data/whatToEat_DB_seoul_review.csv')
     df_diner['diner_category_detail'].fillna('', inplace=True)
     df_diner["diner_menu"] = df_diner["diner_menu"].apply(ast.literal_eval)
