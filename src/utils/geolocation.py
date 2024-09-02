@@ -41,6 +41,8 @@ def geocode(longitude, latitude):
             suburb = ''
 
         return f"{city_name} {neighbourhood} {suburb}에 있구나!"
+
+@st.cache_data
 def search_your_address():
     search_region_text = st.text_input("주소나 키워드로 입력해줘")
     if st.button("검색"):

@@ -46,7 +46,6 @@ def category_filters(diner_category, df_diner_real_review, df_diner):
     return category_filted_df, diner_nearby_cnt
 
 def make_map(desired_df, x, y):
-
     # 지도시각화
     m = folium.Map(location=[y, x], zoom_start=15)
     # Get the center coordinates
