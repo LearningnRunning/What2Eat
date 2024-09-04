@@ -4,7 +4,7 @@ from utils.data_loading import load_excel_data
 from utils.ui_components import choice_avatar, my_chat_message
 from utils.geolocation import geocode, search_your_address
 from utils.data_processing import category_filters, haversine, generate_introduction
-from config.constants import LOGO_IMG_PATH, LOGO_SMALL_IMG_PATH, LOGO_TITLE_IMG_PATH, DEFAULT_ADDRESS_INFO_LIST
+from config.constants import LOGO_IMG_PATH, LOGO_SMALL_IMG_PATH, LOGO_TITLE_IMG_PATH, DEFAULT_ADDRESS_INFO_LIST, PRIORITY_ORDER
 
 # 페이지 설정
 st.set_page_config(
@@ -87,9 +87,16 @@ if len(df_geo_filtered):
 
     df_geo_filtered_real_review = df_geo_filtered.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
 
-    diner_category_lst = sorted([str(category) for category in set(df_geo_filtered_real_review['diner_category_middle'].dropna().to_list()) if str(category) != '음식점'])
-    if diner_category_lst:
-        diner_category = st.multiselect("첫번째 업태", diner_category_lst, diner_category_lst[0], label_visibility='hidden')
+    diner_category_lst = [str(category) for category in set(df_geo_filtered_real_review['diner_category_middle'].dropna().to_list()) if str(category) != '음식점']
+    # 리스트 정렬: 먼저 priority_order에 따라 정렬하고, 그 외 항목들은 우선순위 3으로 설정
+    sorted_diner_category_lst = sorted(diner_category_lst, key=lambda x: PRIORITY_ORDER.get(x, 3))
+
+    print('sorted_diner_category_lst', sorted_diner_category_lst)
+    if sorted_diner_category_lst:
+        diner_category = st.multiselect(
+            label="첫번째 업태",
+            options=sorted_diner_category_lst,
+            label_visibility='hidden')
 
 
         if bool(diner_category):
@@ -101,7 +108,10 @@ if len(df_geo_filtered):
 
                 unique_categories = df_geo_mid_catecory_filtered['diner_category_small'].unique().tolist()   
                 # Create a multi-select radio button
-                seleted_category = st.multiselect("세부 카테고리", unique_categories, unique_categories[0])
+                seleted_category = st.multiselect(
+                    label="세부 카테고리",
+                    options=unique_categories
+                    )
 
                 if seleted_category:
 
@@ -125,8 +135,8 @@ if len(df_geo_filtered):
 
                         my_chat_message(introduction, avatar_style, seed)
 
-        else:
-            my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
+    else:
+        my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
 else:
     my_chat_message("헉.. 거리를 더 넓혀봐, 주변엔 없대", avatar_style, seed)
             

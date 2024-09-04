@@ -42,7 +42,7 @@ def geocode(longitude, latitude):
 
         return f"{city_name} {neighbourhood} {suburb}에 있구나!"
 
-@st.cache_data
+
 def search_your_address():
     search_region_text = st.text_input("주소나 키워드로 입력해줘")
     if st.button("검색"):
@@ -62,7 +62,7 @@ def search_your_address():
                 address_info_list = [response_doc['address_name'], (float(response_doc['x']), float(response_doc['y']))]
                 st.session_state.address = address_info_list[0]
                 st.session_state.user_lat, st.session_state.user_lon = address_info_list[1][1], address_info_list[1][0]
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.write('다른 검색어를 입력해봐... 먄')
                 

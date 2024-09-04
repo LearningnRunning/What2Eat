@@ -133,28 +133,36 @@ if len(df_geo_filtered):
             my_chat_message("세부 업종에서 안 당기는 건 빼!", avatar_style, seed)
 
             unique_categories = df_geo_mid_catecory_filtered['diner_category_small'].unique().tolist()   
-            
-            # Create a multi-select radio button
-            seleted_category = st.multiselect("세부 카테고리", unique_categories, default=unique_categories)
-            df_geo_small_catecory_filtered = df_geo_mid_catecory_filtered[df_geo_mid_catecory_filtered['diner_category_small'].isin(seleted_category)].sort_values(by='real_good_review_percent', ascending=False)
-            
-            if not len(df_geo_small_catecory_filtered):
-                my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
-            
-            elif seleted_category:
-                introduction = f"{radius_distance} 근처 \n {diner_nearby_cnt}개의 맛집 중에 {len(df_geo_small_catecory_filtered)}개의 인증된 곳 발견!\n\n"
+            print(unique_categories)
+            if unique_categories:
+                # Create a multi-select radio button
+                seleted_category = st.multiselect(
+                    label="세부 카테고리",
+                    options=unique_categories
+                    )
+                print('seleted_category', seleted_category)
+                df_geo_small_catecory_filtered = df_geo_mid_catecory_filtered[df_geo_mid_catecory_filtered['diner_category_small'].isin(seleted_category)].sort_values(by='real_good_review_percent', ascending=False)
+                    
+                if not len(df_geo_mid_catecory_filtered):
+                    my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
+                    
+                elif not len(unique_categories):
+                    my_chat_message("이제 메뉴를 골라봐!", avatar_style, seed)
                 
-                for index, row in df_geo_small_catecory_filtered.iterrows():
-                    diner_name = row['diner_name']
-                    diner_category_small = row['diner_category_small']
-                    diner_url = row['diner_url']
-                    real_review_cnt = int(row['real_good_review_cnt'])
-                    distance = int(row['distance']*1000)
-                    diner_good_percent = row['real_good_review_percent']
-                    diner_bad_percent = row['real_bad_review_percent']
-                    introduction += generate_introduction(diner_name, diner_url, diner_bad_percent, radius_kilometers, distance, diner_category_small, real_review_cnt, diner_good_percent)
+                elif seleted_category:
+                    introduction = f"{radius_distance} 근처 \n {diner_nearby_cnt}개의 맛집 중에 {len(df_geo_small_catecory_filtered)}개의 인증된 곳 발견!\n\n"
+                    
+                    for index, row in df_geo_small_catecory_filtered.iterrows():
+                        diner_name = row['diner_name']
+                        diner_category_small = row['diner_category_small']
+                        diner_url = row['diner_url']
+                        real_review_cnt = int(row['real_good_review_cnt'])
+                        distance = int(row['distance']*1000)
+                        diner_good_percent = row['real_good_review_percent']
+                        diner_bad_percent = row['real_bad_review_percent']
+                        introduction += generate_introduction(diner_name, diner_url, diner_bad_percent, radius_kilometers, distance, diner_category_small, real_review_cnt, diner_good_percent)
 
-                my_chat_message(introduction, avatar_style, seed)
+                    my_chat_message(introduction, avatar_style, seed)
 
         else:
             my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
