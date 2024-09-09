@@ -91,7 +91,7 @@ if len(df_geo_filtered):
     # 리스트 정렬: 먼저 priority_order에 따라 정렬하고, 그 외 항목들은 우선순위 3으로 설정
     sorted_diner_category_lst = sorted(diner_category_lst, key=lambda x: PRIORITY_ORDER.get(x, 3))
 
-    print('sorted_diner_category_lst', sorted_diner_category_lst)
+    # print('sorted_diner_category_lst', sorted_diner_category_lst)
     if sorted_diner_category_lst:
         diner_category = st.multiselect(
             label="첫번째 업태",
