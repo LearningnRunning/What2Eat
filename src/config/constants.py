@@ -7,7 +7,7 @@ DEFAULT_ADDRESS_INFO_LIST = ["강남구 삼성동", 127.0567474, 37.5074423]
 
 DINER_REVIEW_AVG = 3.2
 
-DATA_PATH = './data/seoul_data/whatToEat_DB_seoul_diner_202400902.csv'
+DATA_PATH = './data/seoul_data/whatToEat_DB_seoul_diner_202400909.csv'
 
 # Kakao API settings
 KAKAO_API_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
