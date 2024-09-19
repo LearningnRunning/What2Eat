@@ -3,8 +3,9 @@ import folium
 from folium.plugins import MarkerCluster
 from math import radians, sin, cos, sqrt, atan2
 import streamlit as st
+import pandas as pd
 
-def generate_introduction(diner_name, diner_url, diner_bad_percent, radius_kilometers, distance, diner_category_small, real_review_cnt, diner_good_percent):
+def generate_introduction(diner_name, diner_url, diner_bad_percent, radius_kilometers, distance, diner_category_small, real_review_cnt, diner_good_percent, recommend_score=None):
     introduction = f"[{diner_name}]({diner_url})"
     if diner_bad_percent is not None and diner_bad_percent > 10:
         introduction += f"\n불호(비추)리뷰 비율이 {round(diner_bad_percent, 2)}%나 돼!"
@@ -17,9 +18,14 @@ def generate_introduction(diner_name, diner_url, diner_bad_percent, radius_kilom
             introduction += f" ({diner_category_small})\n"
         else:
             introduction += "\n"
-                            
-        introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n 쩝쩝 퍼센트: {round(diner_good_percent,2)}%"
-                            
+        
+        if recommend_score is not None:
+            introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n"
+            introduction += f"추천강도 {round(100*(recommend_score/5), 1)}% \n"
+            introduction += f"쩝쩝 퍼센트: {round(diner_good_percent,2)}%"
+        else:
+            introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n 쩝쩝 퍼센트: {round(diner_good_percent,2)}%"
+        
         if radius_kilometers >= 0.5:
             introduction += f"\n{distance}M \n\n"
         else:
@@ -37,6 +43,70 @@ def haversine(lat1, lon1, lat2, lon2):
     distance = 6371 * c
 
     return distance
+
+def filter_recommendations_by_distance_memory(recommended_items_df, user_lat, user_lon, radius):
+    # 거리 계산
+    distances = recommended_items_df.apply(lambda row: haversine(
+        user_lat, user_lon, row['diner_lat'], row['diner_lon']), axis=1)
+    recommended_items_df['distance'] = distances
+    # 반경 내의 아이템 필터링
+    filtered_df = recommended_items_df[recommended_items_df['distance'] <= radius]
+    return filtered_df
+
+def predict_rating(user_id, item_id, algo):
+    prediction = algo.predict(user_id, item_id)
+    return prediction.est
+
+def recommend_items(user_id, user_item_matrix, user_similarity_df, num_recommendations=10):
+    # 해당 사용자의 유사도 가져오기
+    similar_users = user_similarity_df[user_id].drop(user_id).sort_values(ascending=False)
+    
+    # 유사한 사용자가 선호하는 아이템 추출
+    similar_users_indices = similar_users.index
+    similar_users_ratings = user_item_matrix.loc[similar_users_indices]
+    
+    # 평균 평점 계산
+    recommendation_scores = similar_users_ratings.mean(axis=0)
+    
+    # 이미 평가한 아이템 제거
+    user_rated_items = user_item_matrix.loc[user_id].dropna().index
+    recommendation_scores = recommendation_scores.drop(user_rated_items, errors='ignore')
+    
+    # 상위 추천 아이템 반환
+    top_items = recommendation_scores.sort_values(ascending=False).head(num_recommendations)
+    top_items_df = pd.DataFrame({
+        
+        'diner_idx': top_items.index,
+        'score': top_items.values
+    })
+    
+    return top_items_df
+
+def recommend_items_model(user_id, algo, trainset, num_recommendations=5):
+    # 사용자가 trainset에 존재하는지 확인
+    try:
+        inner_uid = trainset.to_inner_uid(user_id)
+        user_rated_items = set([j for (j, _) in trainset.ur[inner_uid]])
+    except ValueError:
+        # 사용자가 trainset에 없을 경우 빈 집합으로 초기화
+        user_rated_items = set()
+    
+    all_items = set(trainset.all_items())
+    unrated_items = all_items - user_rated_items
+
+    # 아이템에 대한 예측 평점 계산
+    predictions = []
+    for inner_iid in unrated_items:
+        raw_iid = trainset.to_raw_iid(inner_iid)
+        est = algo.predict(user_id, raw_iid).est
+        predictions.append((raw_iid, est))
+    
+    # 예측 평점 기준으로 정렬하여 상위 추천
+    predictions.sort(key=lambda x: x[1], reverse=True)
+    top_items = predictions[:num_recommendations]
+    top_items_df = pd.DataFrame(top_items, columns=['diner_idx', 'score'])
+    
+    return top_items_df
 
 @st.cache_data
 def category_filters(diner_category, df_diner_real_review, df_diner):
