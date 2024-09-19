@@ -10,7 +10,7 @@ import streamlit as st
 from config.constants import DATA_PATH, MODEL_PATH
 
 @st.cache_data
-def load_excel_data(logo_img_path, logo_small_img_path):
+def load_static_data(logo_img_path, logo_small_img_path, guide_image_path):
     # Get the first CSV file in the directory
     csv_files = glob.glob(DATA_PATH)
     if not csv_files:
@@ -25,8 +25,9 @@ def load_excel_data(logo_img_path, logo_small_img_path):
 
     banner_image = Image.open(logo_img_path)
     icon_image = Image.open(logo_small_img_path)
+    guide_image = Image.open(guide_image_path)
 
-    return df_diner, banner_image, icon_image
+    return df_diner, banner_image, icon_image, guide_image
 
 # # Firebase 초기화 (한 번만 실행되어야 함)
 # def initialize_firebase():

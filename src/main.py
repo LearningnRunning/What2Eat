@@ -1,15 +1,15 @@
 import streamlit as st
 import pandas as pd
 from streamlit_geolocation import streamlit_geolocation
-from utils.data_loading import load_excel_data, load_model
+from utils.data_loading import load_static_data, load_model
 from utils.ui_components import choice_avatar, my_chat_message
 from utils.geolocation import geocode, search_your_address
 from utils.data_processing import category_filters, haversine, generate_introduction, search_menu, recommend_items, recommend_items_model, filter_recommendations_by_distance_memory
-from config.constants import LOGO_IMG_PATH, LOGO_SMALL_IMG_PATH, LOGO_TITLE_IMG_PATH, DEFAULT_ADDRESS_INFO_LIST, PRIORITY_ORDER
+from config.constants import LOGO_IMG_PATH, LOGO_SMALL_IMG_PATH, LOGO_TITLE_IMG_PATH, GUIDE_IMG_PATH, DEFAULT_ADDRESS_INFO_LIST, PRIORITY_ORDER
 
 # 페이지 설정 및 데이터 로딩
 st.set_page_config(page_title="머먹?", page_icon=LOGO_SMALL_IMG_PATH, layout="wide")
-df_diner, banner_image, icon_image = load_excel_data(LOGO_IMG_PATH, LOGO_TITLE_IMG_PATH)
+df_diner, banner_image, icon_image, kakao_guide_image = load_static_data(LOGO_IMG_PATH, LOGO_TITLE_IMG_PATH, GUIDE_IMG_PATH)
 df_diner.rename(columns={'index': 'diner_idx'}, inplace=True)
 algo_knn, trainset_knn, user_item_matrix, user_similarity_df = load_model()
 
@@ -90,8 +90,8 @@ if len(df_geo_filtered):
             df_menu_filtered = df_geo_filtered_real_review[df_geo_filtered_real_review.apply(lambda row: search_menu(row, menu_search), axis=1)]
             display_results(df_menu_filtered, diner_nearby_cnt, radius_distance)
     elif search_option == '추천 받기':
-        kakao_id = st.text_input("카카오맵의 닉네임을 알려주세요. 없으면 비워도 돼요")
-        
+        kakao_id = st.text_input("카카오맵의 닉네임을 알려주시면 리뷰를 남긴 기반으로 추천을 해드려요.", value='로기')
+        st.image(kakao_guide_image, width=300)
         # # 사용자-아이템 매트릭스에 사용자가 있는지 확인
         # if kakao_id in user_item_matrix.index:
         #     # 추천 아이템 목록 생성 (기존 사용자)
