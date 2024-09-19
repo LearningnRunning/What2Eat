@@ -2,13 +2,11 @@ import pickle
 import os
 import ast
 import glob
-import json
+
 from PIL import Image
 import pandas as pd
 import streamlit as st
-import tempfile
-import firebase_admin
-from firebase_admin import credentials, storage
+
 from config.constants import DATA_PATH, MODEL_PATH
 
 @st.cache_data
