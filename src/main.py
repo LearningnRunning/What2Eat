@@ -28,7 +28,7 @@ if "address" not in st.session_state:
 
 # 위치 선택 함수
 def select_location():
-    option = st.radio("위치를 선택하세요", ('주변에서 찾기', '주소 검색으로 찾기'))
+    option = st.radio("위치를 선택하세요", ('주변에서 찾기', '키워드로 검색으로 찾기(강남역 or 강남대로 328)'))
     if option == '주변에서 찾기':
         location = streamlit_geolocation()
         if location['latitude'] is not None or location['longitude'] is not None:
