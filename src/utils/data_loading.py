@@ -46,7 +46,7 @@ def load_static_data(logo_img_path, logo_small_img_path, guide_image_path):
 #     blob = bucket.blob(file_name)
 #     return blob.download_as_string()
 
-@st.cache_data
+st.cache_resource
 def load_model():
     # trainset_knn 로드
     with open(os.path.join(MODEL_PATH, 'svd_algo.pkl'), 'rb') as f:
