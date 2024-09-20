@@ -36,7 +36,7 @@ def select_location():
             st.session_state.address = geocode(st.session_state.user_lon, st.session_state.user_lat)
         else:
             st.session_state.address = DEFAULT_ADDRESS_INFO_LIST[0]
-    elif option == '주소 검색으로 찾기':
+    elif option == '키워드로 검색으로 찾기(강남역 or 강남대로 328)':
         search_your_address()
     return st.session_state.user_lat, st.session_state.user_lon, st.session_state.address
 
@@ -90,7 +90,7 @@ if len(df_geo_filtered):
             df_menu_filtered = df_geo_filtered_real_review[df_geo_filtered_real_review.apply(lambda row: search_menu(row, menu_search), axis=1)]
             display_results(df_menu_filtered, diner_nearby_cnt, radius_distance)
     elif search_option == '추천 받기':
-        kakao_id = st.text_input("카카오맵의 닉네임을 알려주시면 리뷰를 남긴 기반으로 추천을 해드려요.", value='로기')
+        kakao_id = st.text_input("카카오맵의 닉네임을 알려주시면 리뷰를 남긴 기반으로 추천을 해드려요.")
         st.image(kakao_guide_image, width=300)
         # # 사용자-아이템 매트릭스에 사용자가 있는지 확인
         # if kakao_id in user_item_matrix.index:
