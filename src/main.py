@@ -47,11 +47,11 @@ def select_radius():
     return {"300m": 0.3, "500m": 0.5, "1km": 1, "3km": 3, "10km": 10}[radius_distance], radius_distance
 
 # 결과 표시 함수
-def display_results(df_filtered, nearby_cnt, radius_distance):
+def display_results(df_filtered, radius_distance):
     if not len(df_filtered):
         my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
     else:
-        introduction = f"{radius_distance} 근처 \n {nearby_cnt}개의 맛집 중에 {len(df_filtered)}개의 인증된 곳 발견!\n\n"
+        introduction = f"{radius_distance} 근처 \n {len(df_filtered)}개의 인증된 곳 발견!\n\n"
         for _, row in df_filtered.iterrows():
             introduction += generate_introduction(
                 row['diner_name'], row['diner_url'], row['real_bad_review_percent'],
@@ -88,7 +88,7 @@ if len(df_geo_filtered):
         menu_search = st.text_input("찾고 싶은 메뉴를 입력하세요")
         if menu_search:
             df_menu_filtered = df_geo_filtered_real_review[df_geo_filtered_real_review.apply(lambda row: search_menu(row, menu_search), axis=1)]
-            display_results(df_menu_filtered, diner_nearby_cnt, radius_distance)
+            display_results(df_menu_filtered, radius_distance)
     # elif search_option == '추천 받기':
     #     kakao_id = st.text_input("카카오맵의 닉네임을 알려주시면 리뷰를 남긴 기반으로 추천을 해드려요.")
     #     st.image(kakao_guide_image, width=300)
@@ -122,14 +122,14 @@ if len(df_geo_filtered):
         if sorted_diner_category_lst:
             diner_category = st.multiselect(label="첫번째 업태", options=sorted_diner_category_lst, label_visibility='hidden')
             if bool(diner_category):
-                df_geo_mid_category_filtered, diner_nearby_cnt = category_filters(diner_category, df_geo_filtered_real_review, df_geo_filtered_radius)
+                df_geo_mid_category_filtered = category_filters(diner_category, df_geo_filtered_real_review, df_geo_filtered_radius)
                 if len(df_geo_mid_category_filtered):
                     my_chat_message("세부 업종에서 안 당기는 건 빼!", avatar_style, seed)
                     unique_categories = df_geo_mid_category_filtered['diner_category_small'].unique().tolist()
                     selected_category = st.multiselect(label="세부 카테고리", options=unique_categories, default=unique_categories)
                     if selected_category:
                         df_geo_small_category_filtered = df_geo_mid_category_filtered[df_geo_mid_category_filtered['diner_category_small'].isin(selected_category)].sort_values(by='real_good_review_percent', ascending=False)
-                        display_results(df_geo_small_category_filtered, diner_nearby_cnt, radius_distance)
+                        display_results(df_geo_small_category_filtered, radius_distance)
         else:
             my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
 else:

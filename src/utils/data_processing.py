@@ -111,9 +111,9 @@ def recommend_items_model(user_id, algo, trainset, num_recommendations=5):
 @st.cache_data
 def category_filters(diner_category, df_diner_real_review, df_diner):
     category_filted_df = df_diner_real_review.query(f"diner_category_middle in @diner_category")
-    diner_nearby_cnt = len(df_diner.query(f"diner_category_middle in @diner_category"))
+    # diner_nearby_cnt = len(df_diner.query(f"diner_category_middle in @diner_category"))
     
-    return category_filted_df, diner_nearby_cnt
+    return category_filted_df #, diner_nearby_cnt
 
 def make_map(desired_df, x, y):
     # 지도시각화

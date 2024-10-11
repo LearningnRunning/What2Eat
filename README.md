@@ -18,7 +18,7 @@ What2Eat analyzes over 1 million reviews from 46,000+ restaurants in Seoul to pr
 You can access What2Eat through the following links:
 
 - [What2Eat Chat Version](https://what2eat-chat.streamlit.app/)
-- [What2Eat Map Version](https://what2eat.streamlit.app/)
+<!-- - [What2Eat Map Version](https://what2eat.streamlit.app/) -->
 - [What2Eat LLM Version](https://laas.wanted.co.kr/sandbox/share?project=PROMPTHON_PRJ_463&hash=f11097aa25dde2ef411ac331f47c1a3d1199331e8c4d10adebd7750576f442ff)
 
 ## 🛠️ Built With
@@ -49,13 +49,13 @@ For more detailed information about the development process and methodologies, c
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/YourGitHubUsername/What2Eat/issues).
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/learningnrunning/What2Eat/issues).
 
 ## 📫 Contact
 
-Your Name - [Your Email]
+Seongrok Kim- [max_sungrok@naver.com]
 
-Project Link: [https://github.com/YourGitHubUsername/What2Eat](https://github.com/YourGitHubUsername/What2Eat)
+Project Link: [https://github.com/learningnrunning/What2Eat](https://github.com/learningnrunning/What2Eat)
 
 ## 🙏 Acknowledgements
 
