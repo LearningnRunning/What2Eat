@@ -21,7 +21,7 @@ def load_static_data(logo_img_path, logo_small_img_path, guide_image_path):
     # Load the CSV data and create the DataFrame
     df_diner = pd.read_csv(first_csv_file)
     df_diner['diner_category_detail'].fillna('', inplace=True)
-    df_diner["diner_menu"] = df_diner["diner_menu"].apply(ast.literal_eval)
+    # df_diner["diner_menu"] = df_diner["diner_menu"].apply(ast.literal_eval)
 
     banner_image = Image.open(logo_img_path)
     icon_image = Image.open(logo_small_img_path)
