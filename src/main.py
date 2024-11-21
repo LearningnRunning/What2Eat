@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from streamlit_geolocation import streamlit_geolocation
-from utils.data_loading import load_static_data, load_model
+from utils.data_loading import load_static_data
 from utils.ui_components import choice_avatar, my_chat_message
 from utils.geolocation import geocode, search_your_address
 from utils.data_processing import category_filters, haversine, generate_introduction, search_menu, recommend_items, recommend_items_model, filter_recommendations_by_distance_memory
@@ -54,7 +54,7 @@ def display_results(df_filtered, radius_distance):
         introduction = f"{radius_distance} 근처 \n {len(df_filtered)}개의 인증된 곳 발견!\n\n"
         for _, row in df_filtered.iterrows():
             introduction += generate_introduction(
-                row['diner_name'], row['diner_url'], row['real_bad_review_percent'],
+                row['diner_idx'], row['diner_name'], row['real_bad_review_percent'],
                 radius_kilometers, int(row['distance']*1000), row['diner_category_small'],
                 int(row['real_good_review_cnt']), row['real_good_review_percent'],
                 row.get('score')  # score와 recommend_score 추가
@@ -79,8 +79,8 @@ if len(df_geo_filtered):
     
     # 선택된 반경으로 다시 필터링
     df_geo_filtered_radius = df_geo_filtered[df_geo_filtered['distance'] <= radius_kilometers]
-    df_geo_filtered_radius = df_geo_filtered_radius[df_geo_filtered_radius['real_good_review_cnt'].notna()]
-    df_geo_filtered_real_review = df_geo_filtered_radius.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
+    df_geo_filtered_real_review = df_geo_filtered_radius[df_geo_filtered_radius['real_good_review_cnt'].notna()]
+    # df_geo_filtered_real_review = df_geo_filtered_radius.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
 
     search_option = st.radio("검색 방법을 선택하세요", ('카테고리로 찾기', '메뉴로 찾기')) #, '추천 받기'
     diner_nearby_cnt = len(df_geo_filtered)

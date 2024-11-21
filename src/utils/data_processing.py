@@ -5,8 +5,8 @@ from math import radians, sin, cos, sqrt, atan2
 import streamlit as st
 import pandas as pd
 
-def generate_introduction(diner_name, diner_url, diner_bad_percent, radius_kilometers, distance, diner_category_small, real_review_cnt, diner_good_percent, recommend_score=None):
-    introduction = f"[{diner_name}]({diner_url})"
+def generate_introduction(diner_idx, diner_name, diner_bad_percent, radius_kilometers, distance, diner_category_small, real_review_cnt, diner_good_percent, recommend_score=None):
+    introduction = f"[{diner_name}](https://place.map.kakao.com/{diner_idx})"
     if diner_bad_percent is not None and diner_bad_percent > 10:
         introduction += f"\n불호(비추)리뷰 비율이 {round(diner_bad_percent, 2)}%나 돼!"
         if radius_kilometers >= 0.5:
@@ -177,7 +177,7 @@ def make_map(desired_df, x, y):
 def popup_html(diner_row, linke_tags, unlike):
     diner_name = diner_row['diner_name']
     diner_category_small = diner_row['diner_category_small']
-    diner_url = diner_row['diner_url']
+    diner_url = f"https://place.map.kakao.com/{diner_row['diner_idx']}"
     diner_open_time = diner_row["diner_open_time"]
     real_review_cnt = int(diner_row['real_good_review_cnt'])
     distance = int(diner_row['distance']*1000)

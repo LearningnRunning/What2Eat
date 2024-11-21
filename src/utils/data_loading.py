@@ -46,25 +46,25 @@ def load_static_data(logo_img_path, logo_small_img_path, guide_image_path):
 #     blob = bucket.blob(file_name)
 #     return blob.download_as_string()
 
-st.cache_resource
-def load_model():
-    # trainset_knn 로드
-    with open(os.path.join(MODEL_PATH, 'svd_algo.pkl'), 'rb') as f:
-        algo_knn = pickle.load(f)
+# st.cache_resource
+# def load_model():
+#     # trainset_knn 로드
+#     with open(os.path.join(MODEL_PATH, 'svd_algo.pkl'), 'rb') as f:
+#         algo_knn = pickle.load(f)
 
 
-    # trainset_knn 로드
-    with open(os.path.join(MODEL_PATH, 'trainset.pkl'), 'rb') as f:
-        trainset_knn = pickle.load(f)
+#     # trainset_knn 로드
+#     with open(os.path.join(MODEL_PATH, 'trainset.pkl'), 'rb') as f:
+#         trainset_knn = pickle.load(f)
 
 
-    # TODO: target_region='seoul_beta'
+#     # TODO: target_region='seoul_beta'
     
-    # # user_item_matrix 저장
-    # with open(os.path.join(MODEL_PATH, f'user_item_matrix_{target_region}_240918.pkl'), 'rb') as f:
-    #     user_item_matrix = pickle.load(f)
+#     # # user_item_matrix 저장
+#     # with open(os.path.join(MODEL_PATH, f'user_item_matrix_{target_region}_240918.pkl'), 'rb') as f:
+#     #     user_item_matrix = pickle.load(f)
 
-    # with open(os.path.join(MODEL_PATH, f'user_similarity_{target_region}_240918.pkl'), 'rb') as f:
-    #     user_similarity_df = pickle.load(f)
-    user_item_matrix, user_similarity_df =[], []
-    return algo_knn, trainset_knn, user_item_matrix, user_similarity_df
+#     # with open(os.path.join(MODEL_PATH, f'user_similarity_{target_region}_240918.pkl'), 'rb') as f:
+#     #     user_similarity_df = pickle.load(f)
+#     user_item_matrix, user_similarity_df =[], []
+#     return algo_knn, trainset_knn, user_item_matrix, user_similarity_df
