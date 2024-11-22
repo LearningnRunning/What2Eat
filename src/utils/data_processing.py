@@ -242,7 +242,7 @@ def popup_html(diner_row, linke_tags, unlike):
 
 # 메뉴 검색 함수 정의
 def search_menu(row, search_term):
-    search_fields = ['diner_menu_name', 'diner_category_large', 'diner_category_middle', 'diner_category_small', 'diner_category_detail']
+    search_fields = ['diner_menu_name', 'diner_category_middle', 'diner_category_small', 'diner_category_detail']
     for field in search_fields:
         if isinstance(row[field], str) and search_term in row[field]:
             return True
