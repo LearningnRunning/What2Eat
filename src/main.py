@@ -56,7 +56,7 @@ def display_results(df_filtered, radius_distance):
             introduction += generate_introduction(
                 row['diner_idx'], row['diner_name'], row['real_bad_review_percent'],
                 radius_kilometers, int(row['distance']*1000), row['diner_category_small'],
-                int(row['real_good_review_cnt']), row['real_good_review_percent'],
+                row['real_good_review_cnt'], row['real_good_review_percent'],
                 row.get('score')  # score와 recommend_score 추가
             )
         my_chat_message(introduction, avatar_style, seed)
@@ -88,6 +88,8 @@ if len(df_geo_filtered):
         menu_search = st.text_input("찾고 싶은 메뉴를 입력하세요")
         if menu_search:
             df_menu_filtered = df_geo_filtered_real_review[df_geo_filtered_real_review.apply(lambda row: search_menu(row, menu_search), axis=1)]
+            df_geo_filtered = df_geo_filtered.sort_values(by="real_good_review_score", ascending=False)
+
             display_results(df_menu_filtered, radius_distance)
     # elif search_option == '추천 받기':
     #     kakao_id = st.text_input("카카오맵의 닉네임을 알려주시면 리뷰를 남긴 기반으로 추천을 해드려요.")
