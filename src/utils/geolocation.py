@@ -20,9 +20,9 @@ def geocode(longitude, latitude):
     print(location)
     address_components = location.raw['address']
     
-
-    if address_components.get('city') not in ['서울특별시', '과천시', '성남시']:
-        return '미안해.. 아직 서울만 돼....'
+    print(address_components.get('city'))
+    if address_components.get('city') not in ['서울특별시', '과천시', '성남시', '속초시', '강릉시', '양양군']:
+        return '미안해.. 아직 데이터가 없는 곳이야....'
     
     else:
         if 'city' in address_components:
