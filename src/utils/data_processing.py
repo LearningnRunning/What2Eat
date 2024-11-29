@@ -7,29 +7,23 @@ import pandas as pd
 
 def generate_introduction(diner_idx, diner_name, diner_bad_percent, radius_kilometers, distance, diner_category_small, real_review_cnt, diner_good_percent, recommend_score=None):
     introduction = f"[{diner_name}](https://place.map.kakao.com/{diner_idx})"
-    if diner_bad_percent is not None and diner_bad_percent > 10:
-        introduction += f"\n불호(비추)리뷰 비율이 {round(diner_bad_percent, 2)}%나 돼!"
-        if radius_kilometers >= 0.5:
-            introduction += f"\n{distance}M \n\n"
-        else:
-            introduction += "\n\n"
+
+    if diner_name:
+        introduction += f" ({diner_category_small})\n"
     else:
-        if diner_name:
-            introduction += f" ({diner_category_small})\n"
-        else:
-            introduction += "\n"
-        
-        if recommend_score is not None:
-            introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n"
-            introduction += f"추천강도 {round(100*(recommend_score/5), 1)}% \n"
-            introduction += f"쩝쩝 퍼센트: {round(diner_good_percent,2)}%"
-        else:
-            introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n 쩝쩝 퍼센트: {round(diner_good_percent,2)}%"
-        
-        if radius_kilometers >= 0.5:
-            introduction += f"\n{distance}M \n\n"
-        else:
-            introduction += "\n\n"
+        introduction += "\n"
+    
+    if recommend_score is not None:
+        introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n"
+        introduction += f"추천강도 {round(100*(recommend_score/5), 1)}% \n"
+        introduction += f"쩝쩝 퍼센트: {round(diner_good_percent,2)}%"
+    else:
+        introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n 쩝쩝 퍼센트: {round(diner_good_percent,2)}%"
+    
+    if radius_kilometers >= 0.5:
+        introduction += f"\n{distance}M \n\n"
+    else:
+        introduction += "\n\n"
     
     return introduction
 

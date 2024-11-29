@@ -48,17 +48,44 @@ def select_radius():
 
 # 결과 표시 함수
 def display_results(df_filtered, radius_distance):
+    df_filtered = df_filtered.sort_values(by="combined_score", ascending=False)
+
     if not len(df_filtered):
         my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
     else:
-        introduction = f"{radius_distance} 근처 \n {len(df_filtered)}개의 인증된 곳 발견!\n\n"
+        # 나쁜 리뷰와 좋은 리뷰를 분리
+        bad_reviews = []
+        good_reviews = []
+
         for _, row in df_filtered.iterrows():
+            if row['real_bad_review_percent'] is not None and row['real_bad_review_percent'] > 20:
+                bad_reviews.append(row)  # 나쁜 리뷰로 분리
+            else:
+                good_reviews.append(row)  # 좋은 리뷰로 분리
+
+        # 소개 메시지 초기화
+        introduction = f"{radius_distance} 근처 \n {len(df_filtered)}개의 인증된 곳 발견!\n\n"
+
+        # 좋은 리뷰 먼저 처리
+        for row in good_reviews:
             introduction += generate_introduction(
                 row['diner_idx'], row['diner_name'], row['real_bad_review_percent'],
-                radius_kilometers, int(row['distance']*1000), row['diner_category_small'],
+                radius_kilometers, int(row['distance'] * 1000), row['diner_category_small'],
                 row['real_good_review_cnt'], row['real_good_review_percent'],
-                row.get('score')  # score와 recommend_score 추가
+                row.get('score')
             )
+
+        # 나쁜 리뷰 마지막에 처리
+        for row in bad_reviews:
+            # introduction += generate_introduction(
+            #     row['diner_idx'], row['diner_name'], row['real_bad_review_percent'],
+            #     radius_kilometers, int(row['distance'] * 1000), row['diner_category_small'],
+            #     row['real_good_review_cnt'], row['real_good_review_percent'],
+            #     row.get('score')
+            # )
+            introduction += f"\n🚨 주의: [{row['diner_name']}](https://place.map.kakao.com/{row['diner_idx']})의 비추 리뷰가 {round(row['real_bad_review_percent'], 2)}%입니다.\n"
+
+        # 최종 메시지 전송
         my_chat_message(introduction, avatar_style, seed)
 
 # 캐시된 데이터 필터링 함수
@@ -88,7 +115,6 @@ if len(df_geo_filtered):
         menu_search = st.text_input("찾고 싶은 메뉴를 입력하세요")
         if menu_search:
             df_menu_filtered = df_geo_filtered_real_review[df_geo_filtered_real_review.apply(lambda row: search_menu(row, menu_search), axis=1)]
-            df_geo_filtered = df_geo_filtered.sort_values(by="real_good_review_score", ascending=False)
 
             display_results(df_menu_filtered, radius_distance)
     # elif search_option == '추천 받기':
@@ -127,7 +153,7 @@ if len(df_geo_filtered):
                 df_geo_mid_category_filtered = category_filters(diner_category, df_geo_filtered_real_review, df_geo_filtered_radius)
                 if len(df_geo_mid_category_filtered):
                     my_chat_message("세부 업종에서 안 당기는 건 빼!", avatar_style, seed)
-                    unique_categories = df_geo_mid_category_filtered['diner_category_small'].unique().tolist()
+                    unique_categories = df_geo_mid_category_filtered['diner_category_small'].fillna('기타').unique().tolist()
                     selected_category = st.multiselect(label="세부 카테고리", options=unique_categories, default=unique_categories)
                     if selected_category:
                         df_geo_small_category_filtered = df_geo_mid_category_filtered[df_geo_mid_category_filtered['diner_category_small'].isin(selected_category)].sort_values(by='real_good_review_percent', ascending=False)
