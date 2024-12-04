@@ -44,11 +44,19 @@ def geocode(longitude, latitude):
 
 
 def search_your_address():
+    # session_state 초기화
+    if 'last_search' not in st.session_state:
+        st.session_state.last_search = ""
+    
     search_region_text = st.text_input("주소나 키워드로 입력해줘")
-    if st.button("검색"):
+    search_clicked = st.button("검색")
+    
+    # 검색 버튼을 클릭했거나 새로운 검색어로 엔터를 눌렀을 때
+    if search_clicked or (search_region_text and search_region_text != st.session_state.last_search):
+        st.session_state.last_search = search_region_text
+        
         params = {
             "query": search_region_text,
-            # 'analyze_type': 'similar',
             'size': 1
         }
 
