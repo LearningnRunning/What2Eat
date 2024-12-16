@@ -4,47 +4,85 @@ from streamlit_geolocation import streamlit_geolocation
 from utils.data_loading import load_static_data
 from utils.ui_components import choice_avatar, my_chat_message
 from utils.geolocation import geocode, search_your_address
-from utils.data_processing import category_filters, haversine, generate_introduction, search_menu, recommend_items, recommend_items_model, filter_recommendations_by_distance_memory
-from config.constants import LOGO_IMG_PATH, LOGO_SMALL_IMG_PATH, LOGO_TITLE_IMG_PATH, GUIDE_IMG_PATH, DEFAULT_ADDRESS_INFO_LIST, PRIORITY_ORDER
+from utils.data_processing import (
+    category_filters,
+    haversine,
+    generate_introduction,
+    search_menu,
+    recommend_items,
+    recommend_items_model,
+    filter_recommendations_by_distance_memory,
+)
+from config.constants import (
+    LOGO_IMG_PATH,
+    LOGO_SMALL_IMG_PATH,
+    LOGO_TITLE_IMG_PATH,
+    GUIDE_IMG_PATH,
+    DEFAULT_ADDRESS_INFO_LIST,
+    PRIORITY_ORDER,
+)
 
 # 페이지 설정 및 데이터 로딩
 st.set_page_config(page_title="머먹?", page_icon=LOGO_SMALL_IMG_PATH, layout="wide")
-df_diner, banner_image, icon_image, kakao_guide_image = load_static_data(LOGO_IMG_PATH, LOGO_TITLE_IMG_PATH, GUIDE_IMG_PATH)
-df_diner.rename(columns={'index': 'diner_idx'}, inplace=True)
+df_diner, banner_image, icon_image, kakao_guide_image = load_static_data(
+    LOGO_IMG_PATH, LOGO_TITLE_IMG_PATH, GUIDE_IMG_PATH
+)
+df_diner.rename(columns={"index": "diner_idx"}, inplace=True)
 # algo_knn, trainset_knn, user_item_matrix, user_similarity_df = load_model()
 
 # 아바타 선택 및 초기 메시지
 avatar_style, seed = choice_avatar()
 my_chat_message("안녕! 오늘 머먹?", avatar_style, seed)
-my_chat_message("잠깐! AI 머먹을 시험 시행 중이야 한번 써볼래? \n [AI 머먹 이용하기](https://laas.wanted.co.kr/sandbox/share?project=PROMPTHON_PRJ_463&hash=f11097aa25dde2ef411ac331f47c1a3d1199331e8c4d10adebd7750576f442ff)", avatar_style, seed)
+my_chat_message(
+    "잠깐! AI 머먹을 시험 시행 중이야 한번 써볼래? \n [AI 머먹 이용하기](https://laas.wanted.co.kr/sandbox/share?project=PROMPTHON_PRJ_463&hash=f11097aa25dde2ef411ac331f47c1a3d1199331e8c4d10adebd7750576f442ff)",
+    avatar_style,
+    seed,
+)
 
 # 세션 상태 초기화
-if 'generated' not in st.session_state: st.session_state['generated'] = []
-if 'past' not in st.session_state: st.session_state['past'] = []
+if "generated" not in st.session_state:
+    st.session_state["generated"] = []
+if "past" not in st.session_state:
+    st.session_state["past"] = []
 if "user_lat" not in st.session_state or "user_lon" not in st.session_state:
-    st.session_state.user_lat, st.session_state.user_lon = DEFAULT_ADDRESS_INFO_LIST[2], DEFAULT_ADDRESS_INFO_LIST[1]
+    st.session_state.user_lat, st.session_state.user_lon = (
+        DEFAULT_ADDRESS_INFO_LIST[2],
+        DEFAULT_ADDRESS_INFO_LIST[1],
+    )
 if "address" not in st.session_state:
     st.session_state.address = DEFAULT_ADDRESS_INFO_LIST[0]
 
+
 # 위치 선택 함수
 def select_location():
-    option = st.radio("위치를 선택하세요", ('주변에서 찾기', '키워드로 검색으로 찾기(강남역 or 강남대로 328)'))
-    if option == '주변에서 찾기':
+    option = st.radio(
+        "위치를 선택하세요", ("주변에서 찾기", "키워드로 검색으로 찾기(강남역 or 강남대로 328)")
+    )
+    if option == "주변에서 찾기":
         location = streamlit_geolocation()
-        if location['latitude'] is not None or location['longitude'] is not None:
-            st.session_state.user_lat, st.session_state.user_lon = location['latitude'], location['longitude']
+        if location["latitude"] is not None or location["longitude"] is not None:
+            st.session_state.user_lat, st.session_state.user_lon = (
+                location["latitude"],
+                location["longitude"],
+            )
             st.session_state.address = geocode(st.session_state.user_lon, st.session_state.user_lat)
         else:
             st.session_state.address = DEFAULT_ADDRESS_INFO_LIST[0]
-    elif option == '키워드로 검색으로 찾기(강남역 or 강남대로 328)':
+    elif option == "키워드로 검색으로 찾기(강남역 or 강남대로 328)":
         search_your_address()
     return st.session_state.user_lat, st.session_state.user_lon, st.session_state.address
+
 
 # 거리 선택 함수
 def select_radius():
     my_chat_message("어디까지 갈겨?", avatar_style, seed)
-    radius_distance = st.selectbox("어디", ["300m", "500m", "1km", "3km", "10km"], label_visibility='hidden')
-    return {"300m": 0.3, "500m": 0.5, "1km": 1, "3km": 3, "10km": 10}[radius_distance], radius_distance
+    radius_distance = st.selectbox(
+        "어디", ["300m", "500m", "1km", "3km", "10km"], label_visibility="hidden"
+    )
+    return {"300m": 0.3, "500m": 0.5, "1km": 1, "3km": 3, "10km": 10}[
+        radius_distance
+    ], radius_distance
+
 
 # 결과 표시 함수
 def display_results(df_filtered, radius_distance):
@@ -58,7 +96,7 @@ def display_results(df_filtered, radius_distance):
         good_reviews = []
 
         for _, row in df_filtered.iterrows():
-            if row['real_bad_review_percent'] is not None and row['real_bad_review_percent'] > 20:
+            if row["real_bad_review_percent"] is not None and row["real_bad_review_percent"] > 20:
                 bad_reviews.append(row)  # 나쁜 리뷰로 분리
             else:
                 good_reviews.append(row)  # 좋은 리뷰로 분리
@@ -69,10 +107,15 @@ def display_results(df_filtered, radius_distance):
         # 좋은 리뷰 먼저 처리
         for row in good_reviews:
             introduction += generate_introduction(
-                row['diner_idx'], row['diner_name'], row['real_bad_review_percent'],
-                radius_kilometers, int(row['distance'] * 1000), row['diner_category_small'],
-                row['real_good_review_cnt'], row['real_good_review_percent'],
-                row.get('score')
+                row["diner_idx"],
+                row["diner_name"],
+                row["real_bad_review_percent"],
+                radius_kilometers,
+                int(row["distance"] * 1000),
+                row["diner_category_small"],
+                row["combined_score"],
+                row["diner_tag"],
+                row.get("score"),
             )
 
         # 나쁜 리뷰 마지막에 처리
@@ -88,11 +131,15 @@ def display_results(df_filtered, radius_distance):
         # 최종 메시지 전송
         my_chat_message(introduction, avatar_style, seed)
 
+
 # 캐시된 데이터 필터링 함수
 @st.cache_data
 def get_filtered_data(df, user_lat, user_lon, max_radius=10):
-    df['distance'] = df.apply(lambda row: haversine(user_lat, user_lon, row['diner_lat'], row['diner_lon']), axis=1)
-    return df[df['distance'] <= max_radius]
+    df["distance"] = df.apply(
+        lambda row: haversine(user_lat, user_lon, row["diner_lat"], row["diner_lon"]), axis=1
+    )
+    return df[df["distance"] <= max_radius]
+
 
 # 메인 로직
 user_lat, user_lon, user_address = select_location()
@@ -103,18 +150,24 @@ df_geo_filtered = get_filtered_data(df_diner, user_lat, user_lon)
 
 if len(df_geo_filtered):
     radius_kilometers, radius_distance = select_radius()
-    
+
     # 선택된 반경으로 다시 필터링
-    df_geo_filtered_radius = df_geo_filtered[df_geo_filtered['distance'] <= radius_kilometers]
-    df_geo_filtered_real_review = df_geo_filtered_radius[df_geo_filtered_radius['real_good_review_cnt'].notna()]
+    df_geo_filtered_radius = df_geo_filtered[df_geo_filtered["distance"] <= radius_kilometers]
+    df_geo_filtered_real_review = df_geo_filtered_radius[
+        df_geo_filtered_radius["combined_score"].notna()
+    ]
     # df_geo_filtered_real_review = df_geo_filtered_radius.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
 
-    search_option = st.radio("검색 방법을 선택하세요", ('카테고리로 찾기', '메뉴로 찾기')) #, '추천 받기'
+    search_option = st.radio(
+        "검색 방법을 선택하세요", ("카테고리로 찾기", "메뉴로 찾기")
+    )  # , '추천 받기'
     diner_nearby_cnt = len(df_geo_filtered)
-    if search_option == '메뉴로 찾기':
+    if search_option == "메뉴로 찾기":
         menu_search = st.text_input("찾고 싶은 메뉴를 입력하세요")
         if menu_search:
-            df_menu_filtered = df_geo_filtered_real_review[df_geo_filtered_real_review.apply(lambda row: search_menu(row, menu_search), axis=1)]
+            df_menu_filtered = df_geo_filtered_real_review[
+                df_geo_filtered_real_review.apply(lambda row: search_menu(row, menu_search), axis=1)
+            ]
 
             display_results(df_menu_filtered, radius_distance)
     # elif search_option == '추천 받기':
@@ -131,7 +184,7 @@ if len(df_geo_filtered):
     #     # 신규 사용자에 대한 추천 생성 (KNN 기반)
     #     recommended_items_df = recommend_items_model(
     #         kakao_id, algo_knn, trainset_knn, num_recommendations=200
-    #     )        
+    #     )
     #     df_geo_filtered = df_geo_filtered[(df_geo_filtered['real_good_review_cnt'] > 4) & (df_geo_filtered['distance'] <= radius_kilometers)]
     #     # 추천 결과에 위치 정보 병합
     #     recommended_items_df = pd.merge(recommended_items_df, df_geo_filtered, on='diner_idx', how='right')
@@ -141,22 +194,42 @@ if len(df_geo_filtered):
     #     num_final_recommendations = 20
     #     final_recommendations = recommended_items_df.head(num_final_recommendations)
     #     display_results(final_recommendations, diner_nearby_cnt, radius_distance)
-    
+
     else:
         my_chat_message("뭐 먹을겨?", avatar_style, seed)
-        diner_category_lst = [str(category) for category in set(df_geo_filtered_real_review['diner_category_middle'].dropna().to_list()) if str(category) != '음식점']
-        sorted_diner_category_lst = sorted(diner_category_lst, key=lambda x: PRIORITY_ORDER.get(x, 3))
-        
+        diner_category_lst = [
+            str(category)
+            for category in set(
+                df_geo_filtered_real_review["diner_category_middle"].dropna().to_list()
+            )
+            if str(category) != "음식점"
+        ]
+        sorted_diner_category_lst = sorted(
+            diner_category_lst, key=lambda x: PRIORITY_ORDER.get(x, 3)
+        )
+
         if sorted_diner_category_lst:
-            diner_category = st.multiselect(label="첫번째 업태", options=sorted_diner_category_lst, label_visibility='hidden')
+            diner_category = st.multiselect(
+                label="첫번째 업태", options=sorted_diner_category_lst, label_visibility="hidden"
+            )
             if bool(diner_category):
-                df_geo_mid_category_filtered = category_filters(diner_category, df_geo_filtered_real_review, df_geo_filtered_radius)
+                df_geo_mid_category_filtered = category_filters(
+                    diner_category, df_geo_filtered_real_review, df_geo_filtered_radius
+                )
                 if len(df_geo_mid_category_filtered):
                     my_chat_message("세부 업종에서 안 당기는 건 빼!", avatar_style, seed)
-                    unique_categories = df_geo_mid_category_filtered['diner_category_small'].fillna('기타').unique().tolist()
-                    selected_category = st.multiselect(label="세부 카테고리", options=unique_categories, default=unique_categories)
+                    unique_categories = (
+                        df_geo_mid_category_filtered["diner_category_small"].unique().tolist()
+                    )
+                    selected_category = st.multiselect(
+                        label="세부 카테고리", options=unique_categories, default=unique_categories
+                    )
                     if selected_category:
-                        df_geo_small_category_filtered = df_geo_mid_category_filtered[df_geo_mid_category_filtered['diner_category_small'].isin(selected_category)].sort_values(by='real_good_review_percent', ascending=False)
+                        df_geo_small_category_filtered = df_geo_mid_category_filtered[
+                            df_geo_mid_category_filtered["diner_category_small"].isin(
+                                selected_category
+                            )
+                        ].sort_values(by="combined_score", ascending=False)
                         display_results(df_geo_small_category_filtered, radius_distance)
         else:
             my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
