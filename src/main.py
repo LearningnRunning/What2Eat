@@ -80,7 +80,7 @@ def select_radius(avatar_style, seed):
 
 # 결과 표시 함수
 def display_results(df_filtered, radius_distance, avatar_style, seed):
-    df_filtered = df_filtered.sort_values(by="combined_score", ascending=False)
+    df_filtered = df_filtered.sort_values(by="bayesian_avg", ascending=False)
 
     if not len(df_filtered):
         my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
@@ -107,7 +107,7 @@ def display_results(df_filtered, radius_distance, avatar_style, seed):
                 int(radius_distance.replace("m", "").replace("km", "")) / 1000,
                 int(row["distance"] * 1000),
                 row["diner_category_small"],
-                row["combined_score"],
+                row["bayesian_avg"],
                 row["diner_tag"],
                 row.get("score"),
             )
@@ -188,7 +188,7 @@ def ranking_page():
         st.subheader(
             f"{selected_category if selected_category != '전체' else '전체 중간 카테고리'} 카테고리 ({selected_small_category if selected_small_category != '전체' else '전체'}) 랭킹"
         )
-        ranked_df = filtered_city_df.sort_values(by="combined_score", ascending=False)[
+        ranked_df = filtered_city_df.sort_values(by="bayesian_avg", ascending=False)[
             ["diner_name", "diner_url", "diner_category_small"]
         ]
 
@@ -226,7 +226,7 @@ def chat_page():
         # 선택된 반경으로 다시 필터링
         df_geo_filtered_radius = df_geo_filtered[df_geo_filtered["distance"] <= radius_kilometers]
         df_geo_filtered_real_review = df_geo_filtered_radius[
-            df_geo_filtered_radius["combined_score"].notna()
+            df_geo_filtered_radius["bayesian_avg"].notna()
         ]
         # df_geo_filtered_real_review = df_geo_filtered_radius.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
 
@@ -307,7 +307,7 @@ def chat_page():
                                 df_geo_mid_category_filtered["diner_category_small"].isin(
                                     selected_category
                                 )
-                            ].sort_values(by="combined_score", ascending=False)
+                            ].sort_values(by="bayesian_avg", ascending=False)
                             display_results(
                                 df_geo_small_category_filtered, radius_distance, avatar_style, seed
                             )
