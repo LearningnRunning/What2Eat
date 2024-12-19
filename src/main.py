@@ -147,40 +147,54 @@ def ranking_page():
     filtered_zone_df = df_diner[df_diner["zone_idx"] == zone_value]
 
     # 상세 지역 선택
-    city_options = filtered_zone_df["constituency_idx"].dropna().unique()
+    city_options = filtered_zone_df["city_idx"].dropna().unique()
     city_labels = [CITY_INDEX.get(idx, "Unknown") for idx in city_options]
     city_label = st.selectbox("상세 지역을 선택하세요", city_labels)
 
     if city_label:
         city_value = next((k for k, v in CITY_INDEX.items() if v == city_label), None)
         if city_value is not None:
-            filtered_city_df = filtered_zone_df[filtered_zone_df["constituency_idx"] == city_value]
+            filtered_city_df = filtered_zone_df[filtered_zone_df["city_idx"] == city_value]
 
-            # 중간 카테고리 선택
+            # 중간 카테고리 선택 및 필터링
             available_categories = filtered_city_df["diner_category_middle"].dropna().unique()
-            selected_category = st.selectbox("카테고리를 선택하세요", available_categories)
+            selected_category = st.selectbox(
+                "중간 카테고리를 선택하세요", ["전체"] + list(available_categories)
+            )
 
-            # 선택한 카테고리의 데이터 필터링
-            if selected_category:
-                category_df = filtered_city_df[
+            if selected_category != "전체":
+                filtered_city_df = filtered_city_df[
                     filtered_city_df["diner_category_middle"] == selected_category
                 ]
 
-                # 세부 카테고리별 랭킹 표시
-                st.subheader(f"{selected_category} 카테고리 랭킹")
-                ranked_df = category_df.sort_values(by="combined_score", ascending=False)[
-                    ["diner_name", "diner_url", "diner_category_small"]
+            # 세부 카테고리 선택 및 필터링
+            available_small_categories = filtered_city_df["diner_category_small"].dropna().unique()
+            selected_small_category = st.selectbox(
+                "세부 카테고리를 선택하세요", ["전체"] + list(available_small_categories)
+            )
+
+            if selected_small_category != "전체":
+                filtered_city_df = filtered_city_df[
+                    filtered_city_df["diner_category_small"] == selected_small_category
                 ]
 
-                st.dataframe(
-                    ranked_df.rename(
-                        columns={
-                            "diner_name": "음식점명",
-                            "diner_category_small": "세부 카테고리",
-                            "diner_url": "카카오맵링크",
-                        }
-                    )
+            # 세부 카테고리별 랭킹 표시
+            st.subheader(
+                f"{selected_category if selected_category != '전체' else '전체 중간 카테고리'} 카테고리 ({selected_small_category if selected_small_category != '전체' else '전체'}) 랭킹"
+            )
+            ranked_df = filtered_city_df.sort_values(by="combined_score", ascending=False)[
+                ["diner_name", "diner_url", "diner_category_small"]
+            ]
+
+            st.dataframe(
+                ranked_df.rename(
+                    columns={
+                        "diner_name": "음식점명",
+                        "diner_category_small": "세부 카테고리",
+                        "diner_url": "카카오맵링크",
+                    }
                 )
+            )
 
 
 def chat_page():
