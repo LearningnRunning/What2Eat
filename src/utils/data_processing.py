@@ -25,18 +25,16 @@ def generate_introduction(
         introduction += "\n"
 
     if recommend_score is not None:
-        introduction += f"쩝쩝박사 {real_review_cnt}명 인증 \n"
+        introduction += f"쩝쩝박사 {round(real_review_cnt,2)}점 \n"
         # introduction += f"추천강도 {round(100*(recommend_score/5), 1)}% \n"
         # introduction += f"쩝쩝 퍼센트: {round(diner_good_percent,2)}%"
-        introduction += f"추천강도 {recommend_score}% \n"
+        introduction += f"추천지수 {recommend_score}% \n"
         introduction += f"주요 키워드 {', '.join(diner_good_percent)}"
     else:
         # introduction += (
         #     f"쩝쩝박사 {real_review_cnt}명 인증 \n 쩝쩝 퍼센트: {round(diner_good_percent,2)}%"
         # )
-        introduction += (
-            f"쩝쩝박사 {real_review_cnt}명 인증 \n 주요 키워드 {', '.join(diner_good_percent)}"
-        )
+        introduction += f"쩝쩝지수 {round(real_review_cnt,2)}점 인증 \n 주요 키워드 {', '.join(diner_good_percent)}"
     if radius_kilometers >= 0.5:
         introduction += f"\n{distance}M \n\n"
     else:
