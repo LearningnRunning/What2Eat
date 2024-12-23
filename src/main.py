@@ -104,7 +104,7 @@ def display_results(df_filtered, radius_distance, avatar_style, seed):
                 row["diner_idx"],
                 row["diner_name"],
                 row["real_bad_review_percent"],
-                int(radius_distance.replace("m", "").replace("km", "")) / 1000,
+                int(radius_distance.replace("km", "").replace("m", "")) / 1000,
                 int(row["distance"] * 1000),
                 row["diner_category_small"],
                 row["bayesian_avg"],
