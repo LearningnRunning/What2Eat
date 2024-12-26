@@ -188,7 +188,7 @@ def ranking_page():
         st.subheader(
             f"{selected_category if selected_category != '전체' else '전체 중간 카테고리'} 카테고리 ({selected_small_category if selected_small_category != '전체' else '전체'}) 랭킹"
         )
-        ranked_df = filtered_city_df.sort_values(by="bayesian_avg", ascending=False)[
+        ranked_df = filtered_city_df.sort_values(by="combined_score", ascending=False)[
             ["diner_name", "diner_url", "diner_category_small"]
         ]
 

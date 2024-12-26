@@ -187,108 +187,108 @@ def make_map(desired_df, x, y):
     return m
 
 
-def popup_html(diner_row, linke_tags, unlike):
-    diner_name = diner_row["diner_name"]
-    diner_category_small = diner_row["diner_category_small"]
-    diner_url = f"https://place.map.kakao.com/{diner_row['diner_idx']}"
-    diner_open_time = diner_row["diner_open_time"]
-    real_review_cnt = int(diner_row["real_good_review_cnt"])
-    distance = int(diner_row["distance"] * 1000)
-    diner_good_percent = diner_row["real_good_review_percent"]
+# def popup_html(diner_row, linke_tags, unlike):
+#     diner_name = diner_row["diner_name"]
+#     diner_category_small = diner_row["diner_category_small"]
+#     diner_url = f"https://place.map.kakao.com/{diner_row['diner_idx']}"
+#     diner_open_time = diner_row["diner_open_time"]
+#     real_review_cnt = int(diner_row["real_good_review_cnt"])
+#     distance = int(diner_row["distance"] * 1000)
+#     diner_good_percent = diner_row["real_good_review_percent"]
 
-    if type(diner_url) == float:
-        link = "https://map.kakao.com/"
-    else:
-        link = diner_url
+#     if type(diner_url) == float:
+#         link = "https://map.kakao.com/"
+#     else:
+#         link = diner_url
 
-    if type(diner_open_time) == float:
-        open_time = "준비중"
-    else:
-        open_time = diner_open_time
+#     if type(diner_open_time) == float:
+#         open_time = "준비중"
+#     else:
+#         open_time = diner_open_time
 
-    left_col_color = "#19a7bd"
-    right_col_color = "#f2f0d3"
+#     left_col_color = "#19a7bd"
+#     right_col_color = "#f2f0d3"
 
-    html = (
-        """<!DOCTYPE html>
-                <html>
-                <head>
-                <div>
-                    <a href="{0}" target="_blank" >""".format(
-            link
-        )
-        + """
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/KakaoMap_logo.png" alt="Clickable image" width="20" style="float: left; margin-right: 10px;">
-                    </a>
-                    <p>
-                        <h4 width="200px" >{0}</h4>""".format(
-            diner_name
-        )
-        + """
-                    </p>
-                </div>
-
-
-                <h5 style="margin-bottom:10"; width="80px"> 찐만족도: {0}% \n 찐만족 리뷰 수: {1}개  {2}</h4>""".format(
-            diner_good_percent, real_review_cnt, unlike
-        )
-        + """
-
-                </head>
-                    <table style="height: 126px; width: 150px;">
-                <tbody>
+#     html = (
+#         """<!DOCTYPE html>
+#                 <html>
+#                 <head>
+#                 <div>
+#                     <a href="{0}" target="_blank" >""".format(
+#             link
+#         )
+#         + """
+#                         <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/KakaoMap_logo.png" alt="Clickable image" width="20" style="float: left; margin-right: 10px;">
+#                     </a>
+#                     <p>
+#                         <h4 width="200px" >{0}</h4>""".format(
+#             diner_name
+#         )
+#         + """
+#                     </p>
+#                 </div>
 
 
-                <tr>
-                <td style="width: 30px;background-color: """
-        + left_col_color
-        + """;"><span style="color: #ffffff;">업종</span></td>
-                <td style="width: 100px;background-color: """
-        + right_col_color
-        + """;">{}</td>""".format(diner_category_small)
-        + """
-                </tr>
-                <tr>
-                <td style="width: 30px;background-color: """
-        + left_col_color
-        + """;"><span style="color: #ffffff;">요약</span></td>
-                <td style="width: 100px;background-color: """
-        + right_col_color
-        + """;">{}</td>""".format(linke_tags)
-        + """
-                </tr>
-                <tr>
-                <td style="width: 30px;background-color: """
-        + left_col_color
-        + """;"><span style="color: #ffffff;">영업시간</span></td>
-                <td style="width: 100px;background-color: """
-        + right_col_color
-        + """;">{}</td>""".format(open_time)
-        + """
-                </tr>
-                <tr>
-                <td style="width: 30px;background-color: """
-        + left_col_color
-        + """;"><span style="color: #ffffff;">거리</span></td>
-                <td style="width: 100px;background-color: """
-        + right_col_color
-        + """;">{} M</td>""".format(distance)
-        + """
-                </tr>
+#                 <h5 style="margin-bottom:10"; width="80px"> 찐만족도: {0}% \n 찐만족 리뷰 수: {1}개  {2}</h4>""".format(
+#             diner_good_percent, real_review_cnt, unlike
+#         )
+#         + """
 
-                </tbody>
-                </table>
-                </html>
-                """
-    )
-    return html
+#                 </head>
+#                     <table style="height: 126px; width: 150px;">
+#                 <tbody>
+
+
+#                 <tr>
+#                 <td style="width: 30px;background-color: """
+#         + left_col_color
+#         + """;"><span style="color: #ffffff;">업종</span></td>
+#                 <td style="width: 100px;background-color: """
+#         + right_col_color
+#         + """;">{}</td>""".format(diner_category_small)
+#         + """
+#                 </tr>
+#                 <tr>
+#                 <td style="width: 30px;background-color: """
+#         + left_col_color
+#         + """;"><span style="color: #ffffff;">요약</span></td>
+#                 <td style="width: 100px;background-color: """
+#         + right_col_color
+#         + """;">{}</td>""".format(linke_tags)
+#         + """
+#                 </tr>
+#                 <tr>
+#                 <td style="width: 30px;background-color: """
+#         + left_col_color
+#         + """;"><span style="color: #ffffff;">영업시간</span></td>
+#                 <td style="width: 100px;background-color: """
+#         + right_col_color
+#         + """;">{}</td>""".format(open_time)
+#         + """
+#                 </tr>
+#                 <tr>
+#                 <td style="width: 30px;background-color: """
+#         + left_col_color
+#         + """;"><span style="color: #ffffff;">거리</span></td>
+#                 <td style="width: 100px;background-color: """
+#         + right_col_color
+#         + """;">{} M</td>""".format(distance)
+#         + """
+#                 </tr>
+
+#                 </tbody>
+#                 </table>
+#                 </html>
+#                 """
+#     )
+#     return html
 
 
 # 메뉴 검색 함수 정의
 def search_menu(row, search_term):
     search_fields = [
         "diner_menu_name",
-        "diner_category_middle",
+        "diner_tag" "diner_category_middle",
         "diner_category_small",
         "diner_category_detail",
     ]
