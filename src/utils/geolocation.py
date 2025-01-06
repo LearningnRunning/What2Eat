@@ -5,7 +5,7 @@ import random
 import string
 import requests
 import streamlit as st
-from config.constants import KAKAO_API_URL, KAKAO_API_HEADERS
+from config.constants import KAKAO_API_URL, KAKAO_API_HEADERS, DEFAULT_ADDRESS_INFO_LIST
 
 
 def generate_user_agent():
@@ -24,10 +24,16 @@ def geocode(longitude, latitude):
         location = geolocator.reverse((latitude, longitude))
 
     except GeocoderUnavailable:
-        return "Geocoding 서비스가 현재 사용 불가능합니다.\n 키워드 검색으로 현위치를 찾아주세요."
+        st.warning(
+            "Geocoding 서비스가 현재 사용 불가능합니다.\n 키워드 검색으로 현위치를 찾아주세요."
+        )
+        return DEFAULT_ADDRESS_INFO_LIST[0]
     except Exception as e:
-        return "Geocoding 서비스가 현재 사용 불가능합니다.\n 키워드 검색으로 현위치를 찾아주세요."
-
+        st.error(
+            f"Geocoding 서비스가 현재 사용 불가능합니다.\n 키워드 검색으로 현위치를 찾아주세요."
+        )
+        return DEFAULT_ADDRESS_INFO_LIST[0]
+    # print(location)
     address_components = location.raw["address"]
 
     # print(address_components.get('city'))
