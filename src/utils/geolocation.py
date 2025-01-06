@@ -1,4 +1,6 @@
 from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderUnavailable
+
 import random
 import string
 import requests
@@ -17,8 +19,15 @@ def geocode(longitude, latitude):
 
     geolocator = Nominatim(user_agent=user_agent)
     # deplot_latitude, deplot_longitude = 37.5074423, 127.0567474
-    location = geolocator.reverse((latitude, longitude))
-    # print(location)
+    try:
+
+        location = geolocator.reverse((latitude, longitude))
+
+    except GeocoderUnavailable:
+        return "Geocoding 서비스가 현재 사용 불가능합니다.\n 키워드 검색으로 현위치를 찾아주세요."
+    except Exception as e:
+        return "Geocoding 서비스가 현재 사용 불가능합니다.\n 키워드 검색으로 현위치를 찾아주세요."
+
     address_components = location.raw["address"]
 
     # print(address_components.get('city'))
