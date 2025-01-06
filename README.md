@@ -1,17 +1,16 @@
 # What2Eat(머먹?)
 
-What2Eat is a chatbot-style application that helps you find highly-rated restaurants based on user reviews and ratings from Kakao Map.
 
 ## 🍽️ About the Project
-
-What2Eat analyzes over 1 million reviews from 46,000+ restaurants in Seoul to provide personalized restaurant recommendations. The project uses a unique algorithm to identify "meaningful positive reviews" and "meaningful negative reviews" to give users a more accurate picture of a restaurant's quality.
+**What2Eat** is a smarter way to rank restaurants, moving beyond simple averages and review counts. By incorporating reviewer traits, recency, and subjective biases, it calculates more reliable and nuanced scores to identify the best dining spots.
 
 ### Key Features:
 
 - Chatbot interface for easy interaction
 - Recommendations based on location and food preferences
-- Analysis of "Jjup Jjup Doctors" (쩝쩝박사) - users who gave higher than their average ratings
-- Warning system for restaurants with high "non-favorable" percentages
+- **Personalized Adjustments**: Scores reflect reviewer habits, recency, and credibility.
+- **Robust Rankings**: Bayesian adjustments reduce the impact of outliers and small sample sizes.
+- **Manipulation-Resistant**: Incorporates reviewer activity to mitigate spam or biased reviews.
 
 ## 🚀 Getting Started
 
@@ -29,23 +28,38 @@ You can access What2Eat through the following links:
 
 ## 📊 How It Works
 
-1. **Data Collection**: Over 1 million reviews from 46,000+ Seoul restaurants were collected from Kakao Map.
+1. **Data Collection**: Over 1.5 million reviews from 1,650,000+ Seoul restaurants were collected from Kakao Map.
+   - Data includes reviewer ID, scores, review text, timestamps, and additional metadata like reviewer badges or levels.
 
 2. **Review Analysis**: 
-   - Positive reviews: Identified when a user rates a restaurant higher than their personal average.
-   - Negative reviews: Flagged when a user with an average rating of 3.5+ gives a restaurant 1.5 stars or less.
+   - Each review is evaluated using three factors:
+     - **Reviewer Bias**: How a review’s score compares to the reviewer’s typical scoring pattern (`score_scaled`).
+     - **Recency**: Reviews written within the last 3 months are weighted higher, with older reviews gradually losing weight (`date_scaled`).
+     - **Reviewer Credibility**: Reviewers with higher activity levels or badges receive more influence (`badge_scaled`).
+   - These factors are normalized and combined into a **Combined Score** for each review.
 
 3. **Ranking System**:
-   - "Jjup Jjup Doctors" (쩝쩝박사): Number of meaningful positive reviewers
-   - "Jjup Jjup Percent" (쩝쩝퍼센트): (Number of meaningful positive reviewers / Total reviewers) * 100
-
+   - **Individual Review Aggregation**:
+     - Reviews for each restaurant are combined using **Bayesian Adjusted Averages**, ensuring restaurants with fewer reviews are not unfairly overrepresented.
+   - **Final Score Calculation**:
+     \[
+     \text{Restaurant Score} = \frac{(\mu \times k) + (x} \times N)}{k + N}
+     \]
+     - \( \mu \): Average of all restaurants’ combined scores.
+     - \( k \): Minimum review count threshold (e.g., 5).
+     - \( x \): Restaurant’s average combined score.
+     - \( N \): Number of reviews for the restaurant.
+   
 4. **Display Criteria**:
-   - Restaurants with more than 5 "Jjup Jjup Doctors" are ranked by "Jjup Jjup Percent"
+   - Restaurants are ranked by their **Bayesian Adjusted Scores**.
+   - Additional filters include:
+     - **Cuisine Type**: Narrow down results by category (e.g., Korean, Italian, Cafes).
+     - **Location**: Filter by specific areas or neighborhoods.
    - Warnings are displayed for restaurants with over 10% meaningful negative reviews
 
 ## 📝 Blog Post
 
-For more detailed information about the development process and methodologies, check out our [blog post](https://learningnrunning.github.io/example/tech/review/2024-03-03-From-KakaoRok-to-What2Eat/).
+For more detailed information about the development process and methodologies, check out our [blog post](https://learningnrunning.github.io/post/tech/review/2024-12-30-Aggregate-restaurant-ratings-data/).
 
 ## 🤝 Contributing
 
