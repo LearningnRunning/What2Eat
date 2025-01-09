@@ -9,7 +9,7 @@ from utils.data_processing import (
     haversine,
     generate_introduction,
     search_menu,
-    pick_random_diner,
+    pick_random_diners,
     grade_to_stars,
     # recommend_items,
     # recommend_items_model,
@@ -48,6 +48,15 @@ if "user_lat" not in st.session_state or "user_lon" not in st.session_state:
     )
 if "address" not in st.session_state:
     st.session_state.address = DEFAULT_ADDRESS_INFO_LIST[0]
+# 세션 상태 초기화
+if "result_queue" not in st.session_state:
+    st.session_state.result_queue = []
+
+if "previous_category_small" not in st.session_state:
+    st.session_state.previous_category_small = []
+
+if "consecutive_failures" not in st.session_state:
+    st.session_state.consecutive_failures = 0
 
 
 # 위치 선택 함수
@@ -136,7 +145,6 @@ def get_filtered_data(df, user_lat, user_lon, max_radius=30):
     return filtered_df
 
 
-#  '중국요리', '떡볶이', '국밥', '곱창,막창','회', '피자',
 def ranking_page():
     st.title("지역별 카테고리 랭킹")
 
@@ -252,41 +260,52 @@ def chat_page():
                     df_menu_filtered, radius_kilometers, radius_distance, avatar_style, seed
                 )
         elif search_option == "랜덤 추천 받기":
+            # 버튼 클릭 시 처리
             if st.button("랜덤 뽑기"):
-                result = pick_random_diner(df_geo_filtered_real_review)
-                if result is None:
-                    my_chat_message(
-                        "야, 추천할 레스토랑이 더 이상 없어. 다른 옵션 골라보거나 한 번 더 눌러봐!",
-                        avatar_style,
-                        seed,
-                    )
+                if not st.session_state.result_queue:
+                    # 새로 5개를 뽑아서 큐에 저장
+                    new_results = pick_random_diners(df_geo_filtered_real_review, num_to_select=5)
+                    if new_results is None:
+                        st.error("추천할 레스토랑이 더 이상 없습니다. 다시 시도해주세요!")
+                    else:
+                        st.session_state.result_queue.extend(new_results.to_dict(orient="records"))
 
-                    st.error("추천할 레스토랑이 없어!")
-                else:
-                    diner_name = result["diner_name"]
-                    diner_category_small = result["diner_category_small"]
-                    diner_url = result["diner_url"]
-                    diner_grade = result["diner_grade"]
-                    diner_tag = result["diner_tag"]
-                    diner_menu = result["diner_menu_name"]
-                    diner_distance = round(result["distance"] * 1000, 2)
+                # 큐에서 하나를 꺼내기
+                if st.session_state.result_queue:
+                    result = st.session_state.result_queue.pop(0)  # 큐에서 첫 번째 항목 제거
+                    if result is None:
+                        my_chat_message(
+                            "야, 추천할 레스토랑이 더 이상 없어. 다른 옵션 골라보거나 한 번 더 눌러봐!",
+                            avatar_style,
+                            seed,
+                        )
 
-                    introduction = (
-                        f"✨ **입벌려! 추천 들어간다** ✨\n\n"
-                        f"📍 [{diner_name}]({diner_url}) ({diner_category_small})\n"
-                        f"🗺️ 여기서 대략 **{diner_distance}m** 떨어져 있어.\n\n"
-                    )
+                        st.error("추천할 레스토랑이 없어!")
+                    else:
+                        diner_name = result["diner_name"]
+                        diner_category_small = result["diner_category_small"]
+                        diner_url = result["diner_url"]
+                        diner_grade = result["diner_grade"]
+                        diner_tag = result["diner_tag"]
+                        diner_menu = result["diner_menu_name"]
+                        diner_distance = round(result["distance"] * 1000, 2)
 
-                    introduction += f"{grade_to_stars(diner_grade)}\n\n"
+                        introduction = (
+                            f"✨ **입벌려! 추천 들어간다** ✨\n\n"
+                            f"📍 [{diner_name}]({diner_url}) ({diner_category_small})\n"
+                            f"🗺️ 여기서 대략 **{diner_distance}m** 떨어져 있어.\n\n"
+                        )
 
-                    if diner_tag:
-                        introduction += f"🔑 **주요 키워드**: {'/'.join(diner_tag)}\n"
-                    if diner_menu:
-                        introduction += f"🍴 **주요 메뉴**: {'/'.join(diner_menu[:10])}\n"
+                        introduction += f"{grade_to_stars(diner_grade)}\n\n"
 
-                    introduction += "\n가서 맛있게 먹고 와! 😋"
+                        if diner_tag:
+                            introduction += f"🔑 **주요 키워드**: {'/'.join(diner_tag)}\n"
+                        if diner_menu:
+                            introduction += f"🍴 **주요 메뉴**: {'/'.join(diner_menu[:10])}\n"
 
-                    my_chat_message(introduction, avatar_style, seed)
+                        introduction += "\n가서 맛있게 먹고 와! 😋"
+
+                        my_chat_message(introduction, avatar_style, seed)
 
         # elif search_option == '추천 받기':
         #     kakao_id = st.text_input("카카오맵의 닉네임을 알려주시면 리뷰를 남긴 기반으로 추천을 해드려요.")

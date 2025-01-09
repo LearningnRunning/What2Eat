@@ -200,15 +200,9 @@ def make_map(desired_df, x, y):
     return m
 
 
-# 상태 초기화
-if "previous_category_small" not in st.session_state:
-    st.session_state.previous_category_small = []
-if "consecutive_failures" not in st.session_state:
-    st.session_state.consecutive_failures = 0
-
-
 # 랜덤 뽑기 함수
-def pick_random_diner(df):
+@st.cache_data
+def pick_random_diners(df, num_to_select=5):
     high_grade_diners = df[df["diner_grade"] >= 2]
 
     # 조건: 이미 선택된 카테고리는 제외
@@ -219,19 +213,22 @@ def pick_random_diner(df):
     # 모든 카테고리가 선택된 경우 초기화
     if available_diners.empty:
         st.session_state.previous_category_small.clear()
-        st.session_state.consecutive_failures += 1
 
         # 5번 연속 실패 시 None 반환
+        st.session_state.consecutive_failures += 1
         if st.session_state.consecutive_failures >= 5:
             return None
+
         available_diners = high_grade_diners
 
-    # 랜덤 선택
-    selected_diner = available_diners.sample(n=1).iloc[0]
-    st.session_state.previous_category_small.append(selected_diner["diner_category_small"])
+    # 랜덤으로 num_to_select개 뽑기
+    selected_diners = available_diners.sample(n=min(num_to_select, len(available_diners)))
+    st.session_state.previous_category_small.extend(
+        selected_diners["diner_category_small"].tolist()
+    )
     st.session_state.consecutive_failures = 0  # 성공 시 실패 횟수 초기화
 
-    return selected_diner
+    return selected_diners
 
 
 # def popup_html(diner_row, linke_tags, unlike):
