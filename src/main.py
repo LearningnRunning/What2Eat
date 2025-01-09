@@ -9,9 +9,11 @@ from utils.data_processing import (
     haversine,
     generate_introduction,
     search_menu,
-    recommend_items,
-    recommend_items_model,
-    filter_recommendations_by_distance_memory,
+    pick_random_diner,
+    grade_to_stars,
+    # recommend_items,
+    # recommend_items_model,
+    # filter_recommendations_by_distance_memory,
 )
 from config.constants import (
     LOGO_IMG_PATH,
@@ -29,6 +31,7 @@ st.set_page_config(page_title="머먹?", page_icon=LOGO_SMALL_IMG_PATH, layout="
 df_diner, banner_image, icon_image, kakao_guide_image = load_static_data(
     LOGO_IMG_PATH, LOGO_TITLE_IMG_PATH, GUIDE_IMG_PATH
 )
+st.logo(image=LOGO_TITLE_IMG_PATH, icon_image=LOGO_SMALL_IMG_PATH)
 df_diner.rename(columns={"index": "diner_idx"}, inplace=True)
 # algo_knn, trainset_knn, user_item_matrix, user_similarity_df = load_model()
 
@@ -79,9 +82,9 @@ def select_radius(avatar_style, seed):
 
 
 # 결과 표시 함수
-def display_results(df_filtered, radius_distance, avatar_style, seed):
+def display_results(df_filtered, radius_int, radius_str, avatar_style, seed):
     df_filtered = df_filtered.sort_values(by="bayesian_score", ascending=False)
-
+    print("radius_int", radius_int)
     if not len(df_filtered):
         my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
     else:
@@ -96,30 +99,24 @@ def display_results(df_filtered, radius_distance, avatar_style, seed):
                 good_reviews.append(row)  # 좋은 리뷰로 분리
 
         # 소개 메시지 초기화
-        introduction = f"{radius_distance} 근처 \n {len(df_filtered)}개의 인증된 곳 발견!\n\n"
+        introduction = f"{radius_str} 근처 \n {len(df_filtered)}개의 인증된 곳 발견!\n\n"
 
         # 좋은 리뷰 먼저 처리
         for row in good_reviews:
             introduction += generate_introduction(
                 row["diner_idx"],
                 row["diner_name"],
-                row["real_bad_review_percent"],
-                int(radius_distance.replace("km", "").replace("m", "")) / 1000,
+                radius_int,
                 int(row["distance"] * 1000),
                 row["diner_category_small"],
-                row["score_percentile"],
+                row["diner_grade"],
                 row["diner_tag"],
+                row["diner_menu_name"],
                 row.get("score"),
             )
 
         # 나쁜 리뷰 마지막에 처리
         for row in bad_reviews:
-            # introduction += generate_introduction(
-            #     row['diner_idx'], row['diner_name'], row['real_bad_review_percent'],
-            #     radius_kilometers, int(row['distance'] * 1000), row['diner_category_small'],
-            #     row['real_good_review_cnt'], row['real_good_review_percent'],
-            #     row.get('score')
-            # )
             introduction += f"\n🚨 주의: [{row['diner_name']}](https://place.map.kakao.com/{row['diner_idx']})의 비추 리뷰가 {round(row['real_bad_review_percent'], 2)}%입니다.\n"
 
         # 최종 메시지 전송
@@ -135,11 +132,6 @@ def get_filtered_data(df, user_lat, user_lon, max_radius=30):
 
     # 거리 계산 및 필터링
     filtered_df = df[df["distance"] <= max_radius]
-
-    # # 백분위 순위 계산 (높은 점수가 상위 백분위가 되도록)
-    # filtered_df["score_percentile"] = (
-    #     filtered_df["bayesian_score"].rank(method="min", pct=True) * 100
-    # )
 
     return filtered_df
 
@@ -158,17 +150,19 @@ def ranking_page():
 
     # 상세 지역 선택
     city_options = filtered_zone_df["constituency_idx"].dropna().unique()
-    city_labels = [CITY_INDEX.get(idx, "Unknown") for idx in city_options]
+    city_labels = [CITY_INDEX.get(str(idx), "Unknown") for idx in city_options]
     city_label = st.selectbox("상세 지역을 선택하세요", [selected_zone_all] + city_labels)
+    print("city_label", city_label)
 
     if city_label:
         if city_label == selected_zone_all:
             filtered_city_df = filtered_zone_df
         else:
             city_value = next((k for k, v in CITY_INDEX.items() if v == city_label), None)
+
             if city_value is not None:
                 filtered_city_df = filtered_zone_df[
-                    filtered_zone_df["constituency_idx"] == city_value
+                    filtered_zone_df["constituency_idx"] == int(city_value)
                 ]
 
         # 중간 카테고리 선택 및 필터링
@@ -198,7 +192,7 @@ def ranking_page():
             f"{selected_category if selected_category != '전체' else '전체 중간 카테고리'} 카테고리 ({selected_small_category if selected_small_category != '전체' else '전체'}) 랭킹"
         )
         ranked_df = filtered_city_df.sort_values(by="bayesian_score", ascending=False)[
-            ["diner_name", "diner_url", "diner_category_small"]
+            ["diner_name", "diner_url", "diner_category_small", "diner_grade"]
         ]
 
         st.dataframe(
@@ -207,8 +201,10 @@ def ranking_page():
                     "diner_name": "음식점명",
                     "diner_category_small": "세부 카테고리",
                     "diner_url": "카카오맵링크",
+                    "diner_grade": "쩝슐랭",
                 }
-            )
+            ),
+            use_container_width=True,
         )
 
 
@@ -240,19 +236,58 @@ def chat_page():
         # df_geo_filtered_real_review = df_geo_filtered_radius.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
 
         search_option = st.radio(
-            "검색 방법을 선택하세요", ("카테고리로 찾기", "메뉴로 찾기")
+            "검색 방법을 선택하세요", ("카테고리로 찾기", "메뉴로 찾기", "랜덤 추천 받기")
         )  # , '추천 받기'
-        diner_nearby_cnt = len(df_geo_filtered)
+        # diner_nearby_cnt = len(df_geo_filtered)
         if search_option == "메뉴로 찾기":
             menu_search = st.text_input("찾고 싶은 메뉴를 입력하세요")
             if menu_search:
+
                 df_menu_filtered = df_geo_filtered_real_review[
                     df_geo_filtered_real_review.apply(
                         lambda row: search_menu(row, menu_search), axis=1
                     )
                 ]
+                display_results(
+                    df_menu_filtered, radius_kilometers, radius_distance, avatar_style, seed
+                )
+        elif search_option == "랜덤 추천 받기":
+            if st.button("랜덤 뽑기"):
+                result = pick_random_diner(df_geo_filtered_real_review)
+                if result is None:
+                    my_chat_message(
+                        "야, 추천할 레스토랑이 더 이상 없어. 다른 옵션 골라보거나 한 번 더 눌러봐!",
+                        avatar_style,
+                        seed,
+                    )
 
-                display_results(df_menu_filtered, radius_distance, avatar_style, seed)
+                    st.error("추천할 레스토랑이 없어!")
+                else:
+                    diner_name = result["diner_name"]
+                    diner_category_small = result["diner_category_small"]
+                    diner_url = result["diner_url"]
+                    diner_grade = result["diner_grade"]
+                    diner_tag = result["diner_tag"]
+                    diner_menu = result["diner_menu_name"]
+                    diner_distance = round(result["distance"] * 1000, 2)
+
+                    introduction = (
+                        f"✨ **입벌려! 추천 들어간다** ✨\n\n"
+                        f"📍 [{diner_name}]({diner_url}) ({diner_category_small})\n"
+                        f"🗺️ 여기서 대략 **{diner_distance}m** 떨어져 있어.\n\n"
+                    )
+
+                    introduction += f"{grade_to_stars(diner_grade)}\n\n"
+
+                    if diner_tag:
+                        introduction += f"🔑 **주요 키워드**: {'/'.join(diner_tag)}\n"
+                    if diner_menu:
+                        introduction += f"🍴 **주요 메뉴**: {'/'.join(diner_menu[:10])}\n"
+
+                    introduction += "\n가서 맛있게 먹고 와! 😋"
+
+                    my_chat_message(introduction, avatar_style, seed)
+
         # elif search_option == '추천 받기':
         #     kakao_id = st.text_input("카카오맵의 닉네임을 알려주시면 리뷰를 남긴 기반으로 추천을 해드려요.")
         #     st.image(kakao_guide_image, width=300)
@@ -318,7 +353,11 @@ def chat_page():
                                 )
                             ].sort_values(by="bayesian_score", ascending=False)
                             display_results(
-                                df_geo_small_category_filtered, radius_distance, avatar_style, seed
+                                df_geo_small_category_filtered,
+                                radius_kilometers,
+                                radius_distance,
+                                avatar_style,
+                                seed,
                             )
             else:
                 my_chat_message(
@@ -330,11 +369,11 @@ def chat_page():
 
 def main():
     st.sidebar.title("페이지 선택")
-    page = st.sidebar.radio("이동할 페이지를 선택하세요", ["오늘 머먹?", "TOP 100"])
+    page = st.sidebar.radio("이동할 페이지를 선택하세요", ["🧑‍🍳오늘 머먹?", "📈TOP 100"])
 
-    if page == "오늘 머먹?":
+    if page == "🧑‍🍳오늘 머먹?":
         chat_page()
-    elif page == "TOP 100":
+    elif page == "📈TOP 100":
         ranking_page()
 
 

@@ -60,6 +60,10 @@ def load_static_data(logo_img_path, logo_small_img_path, guide_image_path):
         lambda x: safe_string_to_list(x, "diner_tag")
     )
 
+    df_diner["diner_url"] = df_diner["diner_idx"].apply(
+        lambda diner_idx: f"https://place.map.kakao.com/{diner_idx}"
+    )
+
     banner_image = Image.open(logo_img_path)
     icon_image = Image.open(logo_small_img_path)
     guide_image = Image.open(guide_image_path)

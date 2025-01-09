@@ -4,19 +4,27 @@ from folium.plugins import MarkerCluster
 from math import radians, sin, cos, sqrt, atan2
 import streamlit as st
 import pandas as pd
+import random
+
+
+def grade_to_stars(diner_grade):
+    if diner_grade == 0:
+        return ""
+    return f"🏅 쩝슐랭 {'🌟' * diner_grade} \n"  # 이모티콘 개수 반복
 
 
 def generate_introduction(
     diner_idx,
     diner_name,
-    diner_bad_percent,
     radius_kilometers,
     distance,
     diner_category_small,
-    real_review_cnt,
-    diner_good_percent,
+    diner_grade,
+    diner_tags,
+    diner_menus,
     recommend_score=None,
 ):
+    # 기본 정보
     introduction = f"[{diner_name}](https://place.map.kakao.com/{diner_idx})"
 
     if diner_name:
@@ -24,21 +32,24 @@ def generate_introduction(
     else:
         introduction += "\n"
 
+    # 추천 점수 및 주요 정보
     if recommend_score is not None:
-        introduction += f"쩝쩝상위 {round(real_review_cnt,2)}% \n"
-        # introduction += f"추천강도 {round(100*(recommend_score/5), 1)}% \n"
-        # introduction += f"쩝쩝 퍼센트: {round(diner_good_percent,2)}%"
-        introduction += f"추천지수 {recommend_score}% \n"
-        introduction += f"주요 키워드 {', '.join(diner_good_percent)}"
+        introduction += f"🍽️ 쩝쩝상위 {diner_grade}%야!\n"
+        introduction += f"👍 추천지수: {recommend_score}%\n"
+        if diner_tags:
+            introduction += f"🔑 키워드: {'/'.join(diner_tags)}\n"
+        if diner_menus:
+            introduction += f"🍴 메뉴: {'/'.join(diner_menus[:3])}\n"
     else:
-        # introduction += (
-        #     f"쩝쩝박사 {real_review_cnt}명 인증 \n 쩝쩝 퍼센트: {round(diner_good_percent,2)}%"
-        # )
-        introduction += (
-            f"쩝쩝상위 {round(real_review_cnt,2)}% \n 주요 키워드 {', '.join(diner_good_percent)}"
-        )
+        introduction += f"{grade_to_stars(diner_grade)}"
+        if diner_tags:
+            introduction += f"🔑 키워드: {'/'.join(diner_tags[:5])}\n"
+        if diner_menus:
+            introduction += f"🍴 메뉴: {'/'.join(diner_menus[:3])}\n"
+
+    # 거리 정보 추가
     if radius_kilometers >= 0.5:
-        introduction += f"\n{distance}M \n\n"
+        introduction += f"📍 여기서 {distance}M 정도 떨어져 있어!\n\n"
     else:
         introduction += "\n\n"
 
@@ -189,6 +200,40 @@ def make_map(desired_df, x, y):
     return m
 
 
+# 상태 초기화
+if "previous_category_small" not in st.session_state:
+    st.session_state.previous_category_small = []
+if "consecutive_failures" not in st.session_state:
+    st.session_state.consecutive_failures = 0
+
+
+# 랜덤 뽑기 함수
+def pick_random_diner(df):
+    high_grade_diners = df[df["diner_grade"] >= 2]
+
+    # 조건: 이미 선택된 카테고리는 제외
+    available_diners = high_grade_diners[
+        ~high_grade_diners["diner_category_small"].isin(st.session_state.previous_category_small)
+    ]
+
+    # 모든 카테고리가 선택된 경우 초기화
+    if available_diners.empty:
+        st.session_state.previous_category_small.clear()
+        st.session_state.consecutive_failures += 1
+
+        # 5번 연속 실패 시 None 반환
+        if st.session_state.consecutive_failures >= 5:
+            return None
+        available_diners = high_grade_diners
+
+    # 랜덤 선택
+    selected_diner = available_diners.sample(n=1).iloc[0]
+    st.session_state.previous_category_small.append(selected_diner["diner_category_small"])
+    st.session_state.consecutive_failures = 0  # 성공 시 실패 횟수 초기화
+
+    return selected_diner
+
+
 # def popup_html(diner_row, linke_tags, unlike):
 #     diner_name = diner_row["diner_name"]
 #     diner_category_small = diner_row["diner_category_small"]
@@ -290,11 +335,18 @@ def make_map(desired_df, x, y):
 def search_menu(row, search_term):
     search_fields = [
         "diner_menu_name",
-        "diner_tag" "diner_category_middle",
+        "diner_tag",
+        "diner_category_middle",
         "diner_category_small",
         "diner_category_detail",
     ]
     for field in search_fields:
-        if isinstance(row[field], str) and search_term in row[field]:
-            return True
+        if isinstance(row[field], list):  # 리스트인 경우
+            # 리스트 내 요소 중 검색어가 포함된 경우
+            if any(search_term in item for item in row[field]):
+                return True
+        elif isinstance(row[field], str):  # 문자열인 경우
+            # 문자열에 검색어가 포함된 경우
+            if search_term in row[field]:
+                return True
     return False
