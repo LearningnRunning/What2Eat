@@ -18,3 +18,4 @@ streamlit-chat==0.1.1
 scikit-learn==1.3.0
 streamlit_geolocation==0.0.10
 surprise==0.1
+matplotlib==3.10.0
