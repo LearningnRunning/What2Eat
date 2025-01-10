@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import pydeck as pdk
 from streamlit_geolocation import streamlit_geolocation
 from utils.data_loading import load_static_data
 from utils.ui_components import choice_avatar, my_chat_message
@@ -24,6 +25,9 @@ from config.constants import (
     PRIORITY_ORDER,
     ZONE_INDEX,
     CITY_INDEX,
+    ZONE_COORDINATES,
+    GRADE_COLORS,
+    GRADE_MAP,
 )
 
 # 페이지 설정 및 데이터 로딩
@@ -57,6 +61,16 @@ if "previous_category_small" not in st.session_state:
 
 if "consecutive_failures" not in st.session_state:
     st.session_state.consecutive_failures = 0
+
+
+import matplotlib.colors as mcolors  # 색상 변환에 사용
+
+
+# 색상 코드 (#FF5733)를 [R, G, B, A] 형식으로 변환하는 함수
+def hex_to_rgba(hex_color, alpha=160):
+    rgb = mcolors.hex2color(hex_color)  # (R, G, B) 값 반환 (0~1)
+    rgb_scaled = [int(c * 255) for c in rgb]  # 0~255로 변환
+    return rgb_scaled + [alpha]  # [R, G, B, A] 반환
 
 
 # 위치 선택 함수
@@ -93,7 +107,6 @@ def select_radius(avatar_style, seed):
 # 결과 표시 함수
 def display_results(df_filtered, radius_int, radius_str, avatar_style, seed):
     df_filtered = df_filtered.sort_values(by="bayesian_score", ascending=False)
-    print("radius_int", radius_int)
     if not len(df_filtered):
         my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
     else:
@@ -148,6 +161,17 @@ def get_filtered_data(df, user_lat, user_lon, max_radius=30):
 def ranking_page():
     st.title("지역별 카테고리 랭킹")
 
+    # 쩝슐랭 등급 선택
+    st.subheader("🏅 쩝슐랭 등급 선택")
+    selected_grades = st.multiselect(
+        "보고 싶은 쩝슐랭 등급을 선택하세요 (다중 선택 가능)",
+        options=["🌟", "🌟🌟", "🌟🌟🌟"],
+        default=["🌟", "🌟🌟", "🌟🌟🌟"],
+    )
+
+    # 선택한 등급 숫자로 매핑
+    selected_grade_values = [GRADE_MAP[grade] for grade in selected_grades]
+
     # 지역 선택
     zone = st.selectbox("지역을 선택하세요", list(ZONE_INDEX.keys()))
     zone_value = ZONE_INDEX[zone]
@@ -160,7 +184,6 @@ def ranking_page():
     city_options = filtered_zone_df["constituency_idx"].dropna().unique()
     city_labels = [CITY_INDEX.get(str(idx), "Unknown") for idx in city_options]
     city_label = st.selectbox("상세 지역을 선택하세요", [selected_zone_all] + city_labels)
-    print("city_label", city_label)
 
     if city_label:
         if city_label == selected_zone_all:
@@ -195,20 +218,81 @@ def ranking_page():
                 filtered_city_df["diner_category_small"] == selected_small_category
             ]
 
+        # 쩝슐랭 등급 필터링
+        filtered_city_df = filtered_city_df[
+            filtered_city_df["diner_grade"].isin(selected_grade_values)
+        ]
+
         # 세부 카테고리별 랭킹 표시
         st.subheader(
             f"{selected_category if selected_category != '전체' else '전체 중간 카테고리'} 카테고리 ({selected_small_category if selected_small_category != '전체' else '전체'}) 랭킹"
         )
+
         ranked_df = filtered_city_df.sort_values(by="bayesian_score", ascending=False)[
-            ["diner_name", "diner_url", "diner_category_small", "diner_grade"]
+            [
+                "diner_name",
+                "diner_url",
+                "diner_category_small",
+                "diner_grade",
+                "diner_lat",
+                "diner_lon",
+                "diner_menu_name",
+                "diner_tag",
+            ]
         ]
 
+        # 각 음식점의 핀 정보 생성
+        ranked_df["color"] = ranked_df["diner_grade"].map(GRADE_COLORS)
+        ranked_df["rgba_color"] = ranked_df["color"].apply(lambda x: hex_to_rgba(x))
+
+        data_for_map = ranked_df[
+            ["diner_lat", "diner_lon", "diner_name", "rgba_color", "diner_category_small"]
+        ]
+
+        layer = pdk.Layer(
+            "ScatterplotLayer",
+            data=data_for_map,
+            get_position="[diner_lon, diner_lat]",
+            get_fill_color="rgba_color",  # RGBA 값으로 접근
+            get_radius=100,
+            pickable=True,
+        )
+        # 선택한 지역의 좌표 가져오기
+        center_latitude, center_longitude = ZONE_COORDINATES.get(
+            zone, (37.5665, 126.9780)
+        )  # 기본값: 서울 중심
+
+        view_state = pdk.ViewState(
+            latitude=center_latitude, longitude=center_longitude, zoom=13, pitch=50
+        )
+        # 지도 렌더링
+        map_deck = pdk.Deck(
+            layers=[layer],
+            initial_view_state=view_state,
+            tooltip={"html": "<b>{diner_name}</b>({diner_category_small})"},
+        )
+
+        # Pydeck을 사용하여 지도 렌더링 및 상호작용 결과 확인
+        st.pydeck_chart(map_deck, use_container_width=True)
+
+        # 데이터프레임 표시
         st.dataframe(
-            ranked_df.rename(
+            ranked_df[
+                [
+                    "diner_grade",
+                    "diner_name",
+                    "diner_category_small",
+                    "diner_url",
+                    "diner_menu_name",
+                    "diner_tag",
+                ]
+            ].rename(
                 columns={
                     "diner_name": "음식점명",
                     "diner_category_small": "세부 카테고리",
                     "diner_url": "카카오맵링크",
+                    "diner_menu_name": "메뉴",
+                    "diner_tag": "해시태그",
                     "diner_grade": "쩝슐랭",
                 }
             ),
