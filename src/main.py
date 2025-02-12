@@ -1,34 +1,18 @@
-import streamlit as st
 import pandas as pd
 import pydeck as pdk
+import streamlit as st
+from config.constants import (CITY_INDEX, DEFAULT_ADDRESS_INFO_LIST,
+                              GRADE_COLORS, GRADE_MAP, GUIDE_IMG_PATH,
+                              LOGO_IMG_PATH, LOGO_SMALL_IMG_PATH,
+                              LOGO_TITLE_IMG_PATH, PRIORITY_ORDER,
+                              ZONE_COORDINATES, ZONE_INDEX)
 from streamlit_geolocation import streamlit_geolocation
 from utils.data_loading import load_static_data
-from utils.ui_components import choice_avatar, my_chat_message
+from utils.data_processing import (  # recommend_items,; recommend_items_model,; filter_recommendations_by_distance_memory,
+    category_filters, generate_introduction, grade_to_stars, haversine,
+    pick_random_diners, search_menu)
 from utils.geolocation import geocode, search_your_address
-from utils.data_processing import (
-    category_filters,
-    haversine,
-    generate_introduction,
-    search_menu,
-    pick_random_diners,
-    grade_to_stars,
-    # recommend_items,
-    # recommend_items_model,
-    # filter_recommendations_by_distance_memory,
-)
-from config.constants import (
-    LOGO_IMG_PATH,
-    LOGO_SMALL_IMG_PATH,
-    LOGO_TITLE_IMG_PATH,
-    GUIDE_IMG_PATH,
-    DEFAULT_ADDRESS_INFO_LIST,
-    PRIORITY_ORDER,
-    ZONE_INDEX,
-    CITY_INDEX,
-    ZONE_COORDINATES,
-    GRADE_COLORS,
-    GRADE_MAP,
-)
+from utils.ui_components import choice_avatar, my_chat_message
 
 # 페이지 설정 및 데이터 로딩
 st.set_page_config(page_title="머먹?", page_icon=LOGO_SMALL_IMG_PATH, layout="wide")
@@ -113,6 +97,7 @@ def display_results(df_filtered, radius_int, radius_str, avatar_style, seed):
         # 나쁜 리뷰와 좋은 리뷰를 분리
         bad_reviews = []
         good_reviews = []
+        df_filtered['diner_category_middle'].fillna(df_filtered['diner_category_large'], inplace=True)
 
         for _, row in df_filtered.iterrows():
             if row["real_bad_review_percent"] is not None and row["real_bad_review_percent"] > 20:
@@ -130,7 +115,7 @@ def display_results(df_filtered, radius_int, radius_str, avatar_style, seed):
                 row["diner_name"],
                 radius_int,
                 int(row["distance"] * 1000),
-                row["diner_category_small"],
+                row["diner_category_middle"],
                 row["diner_grade"],
                 row["diner_tag"],
                 row["diner_menu_name"],
@@ -166,56 +151,52 @@ def ranking_page():
     selected_grades = st.multiselect(
         "보고 싶은 쩝슐랭 등급을 선택하세요 (다중 선택 가능)",
         options=["🌟", "🌟🌟", "🌟🌟🌟"],
-        default=["🌟", "🌟🌟", "🌟🌟🌟"],
+        default=["🌟🌟🌟"],
     )
 
     # 선택한 등급 숫자로 매핑
     selected_grade_values = [GRADE_MAP[grade] for grade in selected_grades]
 
     # 지역 선택
-    zone = st.selectbox("지역을 선택하세요", list(ZONE_INDEX.keys()))
-    zone_value = ZONE_INDEX[zone]
+    df_diner[['city', 'region']] = df_diner['diner_num_address'].str.split(' ', n=2, expand=True).iloc[:, :2]
+    ZONE_LIST = sorted(list(df_diner['city'].unique()))
+    zone = st.selectbox("지역을 선택하세요", ZONE_LIST, index=4)
     selected_zone_all = f"{zone} 전체"
 
     # 선택한 지역의 데이터 필터링
-    filtered_zone_df = df_diner[df_diner["zone_idx"] == zone_value]
+    filtered_zone_df = df_diner[df_diner["city"] == zone]
 
     # 상세 지역 선택
-    city_options = filtered_zone_df["constituency_idx"].dropna().unique()
-    city_labels = [CITY_INDEX.get(str(idx), "Unknown") for idx in city_options]
-    city_label = st.selectbox("상세 지역을 선택하세요", [selected_zone_all] + city_labels)
+    city_options = list(filtered_zone_df["region"].dropna().unique())
+    city_label = st.selectbox("상세 지역을 선택하세요", [selected_zone_all] + city_options)
 
     if city_label:
         if city_label == selected_zone_all:
             filtered_city_df = filtered_zone_df
         else:
-            city_value = next((k for k, v in CITY_INDEX.items() if v == city_label), None)
+            filtered_city_df = filtered_zone_df[filtered_zone_df['region'] == city_label]
 
-            if city_value is not None:
-                filtered_city_df = filtered_zone_df[
-                    filtered_zone_df["constituency_idx"] == int(city_value)
-                ]
 
         # 중간 카테고리 선택 및 필터링
-        available_categories = filtered_city_df["diner_category_middle"].dropna().unique()
+        available_categories = filtered_city_df["diner_category_large"].dropna().unique()
         selected_category = st.selectbox(
             "중간 카테고리를 선택하세요", ["전체"] + list(available_categories)
         )
 
         if selected_category != "전체":
             filtered_city_df = filtered_city_df[
-                filtered_city_df["diner_category_middle"] == selected_category
+                filtered_city_df["diner_category_large"] == selected_category
             ]
 
         # 세부 카테고리 선택 및 필터링
-        available_small_categories = filtered_city_df["diner_category_small"].dropna().unique()
+        available_small_categories = filtered_city_df["diner_category_middle"].dropna().unique()
         selected_small_category = st.selectbox(
             "세부 카테고리를 선택하세요", ["전체"] + list(available_small_categories)
         )
 
         if selected_small_category != "전체":
             filtered_city_df = filtered_city_df[
-                filtered_city_df["diner_category_small"] == selected_small_category
+                filtered_city_df["diner_category_middle"] == selected_small_category
             ]
 
         # 쩝슐랭 등급 필터링
@@ -227,12 +208,13 @@ def ranking_page():
         st.subheader(
             f"{selected_category if selected_category != '전체' else '전체 중간 카테고리'} 카테고리 ({selected_small_category if selected_small_category != '전체' else '전체'}) 랭킹"
         )
-
+        filtered_city_df['diner_category_middle'].fillna(filtered_city_df['diner_category_large'],inplace=True)
+        
         ranked_df = filtered_city_df.sort_values(by="bayesian_score", ascending=False)[
             [
                 "diner_name",
                 "diner_url",
-                "diner_category_small",
+                "diner_category_middle",
                 "diner_grade",
                 "diner_lat",
                 "diner_lon",
@@ -241,12 +223,13 @@ def ranking_page():
             ]
         ]
 
+        center_lat, center_lon = ranked_df.iloc[0,4], ranked_df.iloc[0,5]
         # 각 음식점의 핀 정보 생성
         ranked_df["color"] = ranked_df["diner_grade"].map(GRADE_COLORS)
         ranked_df["rgba_color"] = ranked_df["color"].apply(lambda x: hex_to_rgba(x))
 
         data_for_map = ranked_df[
-            ["diner_lat", "diner_lon", "diner_name", "rgba_color", "diner_category_small"]
+            ["diner_lat", "diner_lon", "diner_name", "rgba_color", "diner_category_middle"]
         ]
 
         layer = pdk.Layer(
@@ -259,7 +242,7 @@ def ranking_page():
         )
         # 선택한 지역의 좌표 가져오기
         center_latitude, center_longitude = ZONE_COORDINATES.get(
-            zone, (37.5665, 126.9780)
+            zone, (center_lat, center_lon)
         )  # 기본값: 서울 중심
 
         view_state = pdk.ViewState(
@@ -269,19 +252,18 @@ def ranking_page():
         map_deck = pdk.Deck(
             layers=[layer],
             initial_view_state=view_state,
-            tooltip={"html": "<b>{diner_name}</b>({diner_category_small})"},
+            tooltip={"html": "<b>{diner_name}</b>({diner_category_middle})"},
         )
 
         # Pydeck을 사용하여 지도 렌더링 및 상호작용 결과 확인
         st.pydeck_chart(map_deck, use_container_width=True)
-
         # 데이터프레임 표시
         st.dataframe(
             ranked_df[
                 [
                     "diner_grade",
                     "diner_name",
-                    "diner_category_small",
+                    "diner_category_middle",
                     "diner_url",
                     "diner_menu_name",
                     "diner_tag",
@@ -289,7 +271,7 @@ def ranking_page():
             ].rename(
                 columns={
                     "diner_name": "음식점명",
-                    "diner_category_small": "세부 카테고리",
+                    "diner_category_middle": "세부 카테고리",
                     "diner_url": "카카오맵링크",
                     "diner_menu_name": "메뉴",
                     "diner_tag": "해시태그",
@@ -367,7 +349,7 @@ def chat_page():
                         st.error("추천할 레스토랑이 없어!")
                     else:
                         diner_name = result["diner_name"]
-                        diner_category_small = result["diner_category_small"]
+                        diner_category_middle = result["diner_category_middle"]
                         diner_url = result["diner_url"]
                         diner_grade = result["diner_grade"]
                         diner_tag = result["diner_tag"]
@@ -376,7 +358,7 @@ def chat_page():
 
                         introduction = (
                             f"✨ **입벌려! 추천 들어간다** ✨\n\n"
-                            f"📍 [{diner_name}]({diner_url}) ({diner_category_small})\n"
+                            f"📍 [{diner_name}]({diner_url}) ({diner_category_middle})\n"
                             f"🗺️ 여기서 대략 **{diner_distance}m** 떨어져 있어.\n\n"
                         )
 
@@ -418,13 +400,14 @@ def chat_page():
 
         else:
             my_chat_message("뭐 먹을겨?", avatar_style, seed)
-            diner_category_lst = [
-                str(category)
-                for category in set(
-                    df_geo_filtered_real_review["diner_category_middle"].dropna().to_list()
-                )
-                if str(category) != "음식점"
-            ]
+            diner_category_lst = sorted(list(df_geo_filtered_real_review["diner_category_large"].unique()))
+            # diner_category_lst = [
+            #     str(category)
+            #     for category in set(
+            #         df_geo_filtered_real_review["diner_category_large"].dropna().to_list()
+            #     )
+            #     if str(category) != "음식점"
+            # ]
             sorted_diner_category_lst = sorted(
                 diner_category_lst, key=lambda x: PRIORITY_ORDER.get(x, 3)
             )
@@ -442,7 +425,7 @@ def chat_page():
                     if len(df_geo_mid_category_filtered):
                         my_chat_message("세부 업종에서 안 당기는 건 빼!", avatar_style, seed)
                         unique_categories = (
-                            df_geo_mid_category_filtered["diner_category_small"].unique().tolist()
+                            df_geo_mid_category_filtered["diner_category_middle"].unique().tolist()
                         )
                         selected_category = st.multiselect(
                             label="세부 카테고리",
@@ -451,7 +434,7 @@ def chat_page():
                         )
                         if selected_category:
                             df_geo_small_category_filtered = df_geo_mid_category_filtered[
-                                df_geo_mid_category_filtered["diner_category_small"].isin(
+                                df_geo_mid_category_filtered["diner_category_middle"].isin(
                                     selected_category
                                 )
                             ].sort_values(by="bayesian_score", ascending=False)
