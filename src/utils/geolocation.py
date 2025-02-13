@@ -1,11 +1,14 @@
-from geopy.geocoders import Nominatim
-from geopy.exc import GeocoderUnavailable
+# src/utils/geolocation.py
 
 import random
 import string
+
 import requests
 import streamlit as st
-from config.constants import KAKAO_API_URL, KAKAO_API_HEADERS, DEFAULT_ADDRESS_INFO_LIST
+from config.constants import (DEFAULT_ADDRESS_INFO_LIST, KAKAO_API_HEADERS,
+                              KAKAO_API_URL)
+from geopy.exc import GeocoderUnavailable
+from geopy.geocoders import Nominatim
 
 
 def generate_user_agent():
@@ -63,7 +66,8 @@ def search_your_address():
 
     search_region_text = st.text_input("주소나 키워드로 입력해줘")
     search_clicked = st.button("검색")
-
+    print('search_region_text', search_region_text)
+    
     # 검색 버튼을 클릭했거나 새로운 검색어로 엔터를 눌렀을 때
     if search_clicked or (
         search_region_text and search_region_text != st.session_state.last_search

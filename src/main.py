@@ -1,18 +1,18 @@
+# src/main.py
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
-from config.constants import (CITY_INDEX, DEFAULT_ADDRESS_INFO_LIST,
+from config.constants import (DEFAULT_ADDRESS_INFO_LIST,
                               GRADE_COLORS, GRADE_MAP, GUIDE_IMG_PATH,
                               LOGO_IMG_PATH, LOGO_SMALL_IMG_PATH,
-                              LOGO_TITLE_IMG_PATH, PRIORITY_ORDER,
-                              ZONE_COORDINATES, ZONE_INDEX)
+                              LOGO_TITLE_IMG_PATH, PRIORITY_ORDER)
 from streamlit_geolocation import streamlit_geolocation
 from utils.data_loading import load_static_data
 from utils.data_processing import (  # recommend_items,; recommend_items_model,; filter_recommendations_by_distance_memory,
-    category_filters, generate_introduction, grade_to_stars, haversine,
+    category_filters, grade_to_stars, haversine,
     pick_random_diners, search_menu)
 from utils.geolocation import geocode, search_your_address
-from utils.ui_components import choice_avatar, my_chat_message
+from utils.ui_components import choice_avatar, my_chat_message, generate_introduction
 
 # 페이지 설정 및 데이터 로딩
 st.set_page_config(page_title="머먹?", page_icon=LOGO_SMALL_IMG_PATH, layout="wide")
@@ -47,14 +47,8 @@ if "consecutive_failures" not in st.session_state:
     st.session_state.consecutive_failures = 0
 
 
-import matplotlib.colors as mcolors  # 색상 변환에 사용
 
 
-# 색상 코드 (#FF5733)를 [R, G, B, A] 형식으로 변환하는 함수
-def hex_to_rgba(hex_color, alpha=160):
-    rgb = mcolors.hex2color(hex_color)  # (R, G, B) 값 반환 (0~1)
-    rgb_scaled = [int(c * 255) for c in rgb]  # 0~255로 변환
-    return rgb_scaled + [alpha]  # [R, G, B, A] 반환
 
 
 # 위치 선택 함수
@@ -138,8 +132,10 @@ def get_filtered_data(df, user_lat, user_lon, max_radius=30):
     )
 
     # 거리 계산 및 필터링
+    print(df["distance"])
+    print('max_radius', type(max_radius))
     filtered_df = df[df["distance"] <= max_radius]
-
+    print('여기? filtered_df')
     return filtered_df
 
 
@@ -310,7 +306,7 @@ def chat_page():
         # df_geo_filtered_real_review = df_geo_filtered_radius.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
 
         search_option = st.radio(
-            "검색 방법을 선택하세요", ("카테고리로 찾기", "메뉴로 찾기", "랜덤 추천 받기")
+            "검색 방법을 선택하세요", ("카테고리로 찾기", "메뉴로 찾기", "랜덤 추천 받기"), index=0
         )  # , '추천 받기'
         # diner_nearby_cnt = len(df_geo_filtered)
         if search_option == "메뉴로 찾기":
@@ -400,6 +396,9 @@ def chat_page():
 
         else:
             my_chat_message("뭐 먹을겨?", avatar_style, seed)
+            print('df_geo_filtered_real_review', len(df_geo_filtered_real_review))
+            
+            print('df_geo_filtered_real_review\n', df_geo_filtered_real_review)
             diner_category_lst = sorted(list(df_geo_filtered_real_review["diner_category_large"].unique()))
             # diner_category_lst = [
             #     str(category)
@@ -411,7 +410,7 @@ def chat_page():
             sorted_diner_category_lst = sorted(
                 diner_category_lst, key=lambda x: PRIORITY_ORDER.get(x, 3)
             )
-
+            print('sorted_diner_category_lst', sorted_diner_category_lst)
             if sorted_diner_category_lst:
                 diner_category = st.multiselect(
                     label="첫번째 업태",
