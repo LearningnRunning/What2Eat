@@ -492,13 +492,14 @@ class What2EatApp:
             )
 
     def run(self):
-        search = st.Page(self.chat_page(), title="오늘 머먹?", icon="🧑‍🍳")
-        ranking = st.Page(self.ranking_page(), title="니가 가본 그집", icon="🏠")
+        self.chat_page()
+        # search = st.Page(self.chat_page(), title="오늘 머먹?", icon="🧑‍🍳")
+        # # ranking = st.Page(self.ranking_page(), title="니가 가본 그집", icon="🏠")
 
-        home = [search, ranking]
+        # home = [search]
 
-        pg = st.navigation({"Home": home})
-        pg.run()
+        # pg = st.navigation({"Home": home})
+        # pg.run()
 
 
 if __name__ == "__main__":
