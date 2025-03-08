@@ -1,5 +1,6 @@
 import pydeck as pdk
 import streamlit as st
+import pandas as pd
 from config.constants import (
     DEFAULT_ADDRESS_INFO_LIST,
     GRADE_COLORS,
@@ -24,7 +25,18 @@ from utils.data_processing import (
 from utils.geolocation import geocode, search_your_address
 from utils.ui_components import choice_avatar, display_results, my_chat_message
 
+# ─────────────────────────────────────────────────────────────
+# 0. Fragment 재실행 여부를 확인하기 위한 session_state 설정
+# ─────────────────────────────────────────────────────────────
+if "app_runs" not in st.session_state:
+    st.session_state.app_runs = 0
+if "fragment_runs" not in st.session_state:
+    st.session_state.fragment_runs = 0
 
+
+# ─────────────────────────────────────────────────────────────
+# 1. 기존 SessionState, SearchManager, MapRenderer 등 원본 그대로
+# ─────────────────────────────────────────────────────────────
 class SessionState:
     """세션 상태를 관리하는 클래스"""
 
@@ -38,6 +50,14 @@ class SessionState:
             "result_queue": [],
             "previous_category_small": [],
             "consecutive_failures": 0,
+            # 챗봇 관련 상태 추가
+            "chat_step": "greeting",
+            "avatar_style": None,
+            "seed": None,
+            "df_filtered": None,
+            "radius_kilometers": None,
+            "radius_distance": None,
+            "search_option": None,
         }
 
     def initialize(self):
@@ -106,6 +126,77 @@ class MapRenderer:
 
         return st.pydeck_chart(deck, use_container_width=True)
 
+@st.dialog("음식점 위치")
+def show_restaurant_map(restaurant):
+    """음식점 상세정보와 위치를 보여주는 다이얼로그"""
+    # 음식점 상세 정보 표시
+    num_address = restaurant.get('diner_num_address', None)
+    road_address = restaurant.get('diner_road_address', None)
+
+
+    st.subheader(f"🏪 {restaurant['diner_name']}")
+    if num_address:
+        st.write(f"📍 {num_address}")
+    if road_address:
+        st.write(f"📍 {road_address}")
+    
+    if restaurant['diner_menu_name']:
+        st.write(f"🍴 메뉴: {'/'.join(restaurant['diner_menu_name'][:5])}")
+    if restaurant['diner_tag']:
+        st.write(f"🏷️ 태그: {'/'.join(restaurant['diner_tag'][:5])}")
+    
+    st.write("---")
+
+    # 현재 위치 확인
+    if "user_lat" not in st.session_state or "user_lon" not in st.session_state:
+        location = streamlit_geolocation()
+        if location["latitude"] is not None and location["longitude"] is not None:
+            st.session_state.user_lat = location["latitude"]
+            st.session_state.user_lon = location["longitude"]
+        else:
+            st.session_state.user_lat = DEFAULT_ADDRESS_INFO_LIST[2]
+            st.session_state.user_lon = DEFAULT_ADDRESS_INFO_LIST[1]
+
+    # 현재 위치와 음식점 위치를 포함하는 데이터 생성
+    map_data = pd.DataFrame({
+        'lat': [st.session_state.user_lat, restaurant['diner_lat']],
+        'lon': [st.session_state.user_lon, restaurant['diner_lon']],
+        'name': ['현재 위치', restaurant['diner_name']],
+        'color': [[0, 0, 255], [255, 0, 0]]  # 파란색(현재위치), 빨간색(음식점)
+    })
+
+    # 지도 설정
+    view_state = pdk.ViewState(
+        latitude=(st.session_state.user_lat + restaurant['diner_lat']) / 2,
+        longitude=(st.session_state.user_lon + restaurant['diner_lon']) / 2,
+        zoom=11,
+        pitch=50
+    )
+
+    # 레이어 설정
+    layer = pdk.Layer(
+        "ScatterplotLayer",
+        data=map_data,
+        get_position=["lon", "lat"],
+        get_fill_color="color",
+        get_radius=50,
+        pickable=True,
+        radiusScale=2,
+    )
+
+    # 지도 렌더링
+    deck = pdk.Deck(
+        layers=[layer],
+        initial_view_state=view_state,
+        tooltip={"text": "{name}"},
+        map_style="mapbox://styles/mapbox/light-v10"
+    )
+
+    st.pydeck_chart(deck, use_container_width=True)
+    if st.button("닫기"):
+        st.session_state.show_map = False
+        st.session_state.selected_restaurant = None
+        st.rerun()
 
 @st.cache_resource
 def get_session_state():
@@ -116,7 +207,7 @@ def get_session_state():
 def select_location():
     option = st.radio(
         "위치를 선택하세요",
-        ("주변에서 찾기", "키워드로 검색으로 찾기(강남역 or 강남대로 328)"),
+        ("키워드로 검색으로 찾기(강남역 or 강남대로 328)", "주변에서 찾기"),
     )
     if option == "주변에서 찾기":
         location = streamlit_geolocation()
@@ -148,7 +239,20 @@ def load_app_data():
     df_diner.rename(columns={"index": "diner_idx"}, inplace=True)
     return df_diner
 
+@st.dialog("위치 변경")
+def change_location():
+    """위치 변경을 위한 다이얼로그"""
 
+    user_lat, user_lon, address = select_location()
+    st.session_state.user_lat, st.session_state.user_lon, st.session_state.address = (
+        user_lat, user_lon, address
+    )
+
+    return user_lat, user_lon, address
+
+# ─────────────────────────────────────────────────────────────
+# 2. What2EatApp 클래스 (원본) ─ ranking_page, chat_page 제공
+# ─────────────────────────────────────────────────────────────
 class What2EatApp:
     """What2Eat 앱의 메인 클래스"""
 
@@ -161,6 +265,14 @@ class What2EatApp:
 
     def ranking_page(self):
         st.title("지역별 카테고리 랭킹")
+        # 현재 위치 표시 및 수정 옵션
+        st.subheader("📍 현재 위치")
+        if "address" not in st.session_state:
+            change_location()
+        else:
+            st.write(st.session_state.address)
+            if st.button("위치 변경"):
+                change_location()
 
         # 쩝슐랭 등급 선택
         st.subheader("🏅 쩝슐랭 등급 선택")
@@ -169,8 +281,6 @@ class What2EatApp:
             options=["🌟", "🌟🌟", "🌟🌟🌟"],
             default=["🌟🌟🌟"],
         )
-
-        # 선택한 등급 숫자로 매핑
         selected_grade_values = [GRADE_MAP[grade] for grade in selected_grades]
 
         # 지역 선택
@@ -179,8 +289,9 @@ class What2EatApp:
             .str.split(" ", n=2, expand=True)
             .iloc[:, :2]
         )
-        ZONE_LIST = sorted(list(self.df_diner["city"].unique()))
-        zone = st.selectbox("지역을 선택하세요", ZONE_LIST, index=4)
+        
+        ZONE_LIST = list(self.df_diner["city"].unique())
+        zone = st.selectbox("지역을 선택하세요", ZONE_LIST, index=0)
         selected_zone_all = f"{zone} 전체"
 
         # 선택한 지역의 데이터 필터링
@@ -252,193 +363,162 @@ class What2EatApp:
                     "diner_lon",
                     "diner_menu_name",
                     "diner_tag",
+                    'diner_num_address',
+                    # 'diner_road_address',
+                    'region'
                 ]
             ]
 
-            center_latitude, center_longitude = (
-                ranked_df.iloc[0, 4],
-                ranked_df.iloc[0, 5],
-            )
-            # 각 음식점의 핀 정보 생성
-            ranked_df["color"] = ranked_df["diner_grade"].map(GRADE_COLORS)
-            ranked_df["rgba_color"] = ranked_df["color"].apply(lambda x: hex_to_rgba(x))
+            if not ranked_df.empty:
+                # 지도 다이얼로그를 위한 상태 추가
+                if "show_map" not in st.session_state:
+                    st.session_state.show_map = False
+                if "selected_restaurant" not in st.session_state:
+                    st.session_state.selected_restaurant = None
 
-            data_for_map = ranked_df[
-                [
-                    "diner_lat",
-                    "diner_lon",
-                    "diner_name",
-                    "rgba_color",
-                    "diner_category_middle",
-                ]
-            ]
+                # 음식점 목록을 카드 형태로 표시
+                ranked_df = ranked_df[:100]
+                for _, row in ranked_df.iterrows():
+                    with st.container():
+                        col1, col2, col3 = st.columns([1, 2, 1])
+                        with col1:
+                            st.write(grade_to_stars(row['diner_grade']))
+                        with col2:
+                            st.write(f"**[{row['diner_name']}]({row['diner_url']})** | {row['diner_category_middle']} | {row['region']}")
+                        with col3:
+                            if st.button("상세정보", key=f"map_{row['diner_name']}"):
+                                st.session_state.show_map = True
+                                st.session_state.selected_restaurant = row
+                                show_restaurant_map(st.session_state.selected_restaurant)
+                        st.divider()
 
-            layer = pdk.Layer(
-                "ScatterplotLayer",
-                data=data_for_map,
-                get_position="[diner_lon, diner_lat]",
-                get_fill_color="rgba_color",  # RGBA 값으로 접근
-                get_radius=100,
-                pickable=True,
-            )
-
-            view_state = pdk.ViewState(
-                latitude=center_latitude, longitude=center_longitude, zoom=13, pitch=50
-            )
-            # 지도 렌더링
-            map_deck = pdk.Deck(
-                layers=[layer],
-                initial_view_state=view_state,
-                tooltip={"html": "<b>{diner_name}</b>({diner_category_middle})"},
-            )
-
-            # Pydeck을 사용하여 지도 렌더링 및 상호작용 결과 확인
-            st.pydeck_chart(map_deck, use_container_width=True)
-            # 데이터프레임 표시
-            st.dataframe(
-                ranked_df[
-                    [
-                        "diner_grade",
-                        "diner_name",
-                        "diner_category_middle",
-                        "diner_url",
-                        "diner_menu_name",
-                        "diner_tag",
-                    ]
-                ].rename(
-                    columns={
-                        "diner_name": "음식점명",
-                        "diner_category_middle": "세부 카테고리",
-                        "diner_url": "카카오맵링크",
-                        "diner_menu_name": "메뉴",
-                        "diner_tag": "해시태그",
-                        "diner_grade": "쩝슐랭",
-                    }
-                ),
-                use_container_width=True,
-            )
+        
+            else:
+                st.warning("해당 조건의 랭킹 데이터가 없습니다.")
 
     def chat_page(self):
-        # 아바타 선택 및 초기 메시지
-        avatar_style, seed = choice_avatar()
-        my_chat_message("안녕! 오늘 머먹?", avatar_style, seed)
-        # my_chat_message(
-        #     "잠깐! AI 머먹을 시험 시행 중이야 한번 써볼래? \n [AI 머먹 이용하기](https://laas.wanted.co.kr/sandbox/share?project=PROMPTHON_PRJ_463&hash=f11097aa25dde2ef411ac331f47c1a3d1199331e8c4d10adebd7750576f442ff)",
-        #     avatar_style,
-        #     seed,
-        # )
+        # 아바타 선택 및 초기화
+        if st.session_state.avatar_style is None:
+            st.session_state.avatar_style, st.session_state.seed = choice_avatar()
+        
+        avatar_style = st.session_state.avatar_style
+        seed = st.session_state.seed
 
-        # 메인 로직
-        user_lat, user_lon, user_address = select_location()
-        my_chat_message(user_address, avatar_style, seed)
+        # 단계 1: 인사 및 위치 확인
+        if st.session_state.chat_step == "greeting":
+            my_chat_message("안녕! 오늘 머먹?", avatar_style, seed)
+            
+            if "address" not in st.session_state:
+                change_location()
+            
+            my_chat_message(f"{st.session_state.address} 근처에서 찾아볼게! 만약 다른 위치에서 찾고 싶다면 아래 버튼을 눌러!", avatar_style, seed)
+            
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if st.button("위치 변경", use_container_width=True):
+                    change_location()
+            with col2:
+                if st.button("다음 단계로", use_container_width=True):
+                    st.session_state.chat_step = "select_radius"
+                    st.rerun()
 
-        # 최대 반경 10km로 데이터 필터링 (캐시 사용)
-        df_geo_filtered = get_filtered_data(self.df_diner, user_lat, user_lon)
-
-        if len(df_geo_filtered):
+        # 단계 2: 반경 선택
+        elif st.session_state.chat_step == "select_radius":
             my_chat_message("어디까지 갈겨?", avatar_style, seed)
-
             radius_kilometers, radius_distance = select_radius(avatar_style, seed)
+            
+            # 반경 내 데이터 필터링
+            df_geo_filtered = get_filtered_data(
+                self.df_diner, 
+                st.session_state.user_lat, 
+                st.session_state.user_lon
+            )
+            df_geo_filtered = df_geo_filtered[(df_geo_filtered['diner_grade'].notna())]
+            
+            if len(df_geo_filtered):
+                df_geo_filtered_radius = df_geo_filtered[
+                    df_geo_filtered["distance"] <= radius_kilometers
+                ]
+                st.session_state.df_filtered = df_geo_filtered_radius[
+                    df_geo_filtered_radius["bayesian_score"].notna()
+                ]
+                
+                if len(st.session_state.df_filtered):
+                    radius_col1, radius_col2 = st.columns([2, 1])
+                    with radius_col2:
+                        if st.session_state.chat_step != "greeting":
+                            if st.button("처음으로"):
+                                st.session_state.chat_step = "greeting"
+                                st.rerun()
+                    with radius_col1:
+                        if st.button("다음 단계로", use_container_width=True):
+                            st.session_state.chat_step = "search_method"
+                            st.rerun()
+                else:
+                    my_chat_message(
+                        "헉.. 이 반경에는 찐맛집이 없네..😢\n다른 반경을 선택해볼까?",
+                        avatar_style,
+                        seed,
+                    )
+            else:
+                my_chat_message(
+                    "헉.. 주변에 맛집이 없대.. \n다른 위치를 찾아볼까?",
+                    avatar_style,
+                    seed,
+                )
+                if st.button("위치 다시 선택하기", use_container_width=True):
+                    st.session_state.chat_step = "greeting"
+                    st.rerun()
 
-            # 선택된 반경으로 다시 필터링
-            df_geo_filtered_radius = df_geo_filtered[
-                df_geo_filtered["distance"] <= radius_kilometers
-            ]
-            df_geo_filtered_real_review = df_geo_filtered_radius[
-                df_geo_filtered_radius["bayesian_score"].notna()
-            ]
-            # df_geo_filtered_real_review = df_geo_filtered_radius.query(f"(diner_review_avg >= diner_review_avg) and (real_good_review_cnt >= 5)")
-
+        # 단계 3: 검색 방법 선택
+        elif st.session_state.chat_step == "search_method":
             search_option = st.radio(
                 "검색 방법을 선택하세요",
                 ("카테고리로 찾기", "메뉴로 찾기", "랜덤 추천 받기"),
                 index=0,
-            )  # , '추천 받기'
-            # diner_nearby_cnt = len(df_geo_filtered)
-            if search_option == "메뉴로 찾기":
+            )
+            
+            if st.button("선택 완료", use_container_width=True):
+                st.session_state.search_option = search_option
+                st.session_state.chat_step = "search"
+                st.rerun()
+
+        # 단계 4: 검색 실행
+        elif st.session_state.chat_step == "search":
+            if st.session_state.search_option == "메뉴로 찾기":
                 menu_search = st.text_input("찾고 싶은 메뉴를 입력하세요")
                 if menu_search:
-                    df_menu_filtered = df_geo_filtered_real_review[
-                        df_geo_filtered_real_review.apply(
+                    df_menu_filtered = st.session_state.df_filtered[
+                        st.session_state.df_filtered.apply(
                             lambda row: search_menu(row, menu_search), axis=1
                         )
                     ]
                     display_results(
                         df_menu_filtered,
-                        radius_kilometers,
-                        radius_distance,
+                        st.session_state.radius_kilometers,
+                        st.session_state.radius_distance,
                         avatar_style,
                         seed,
                     )
-            elif search_option == "랜덤 추천 받기":
-                # 버튼 클릭 시 처리
-                if st.button("랜덤 뽑기"):
-                    if not st.session_state.result_queue:
-                        # 새로 5개를 뽑아서 큐에 저장
-                        new_results = pick_random_diners(
-                            df_geo_filtered_real_review, num_to_select=5
-                        )
-                        if new_results is None:
-                            st.error(
-                                "추천할 레스토랑이 더 이상 없습니다. 다시 시도해주세요!"
-                            )
-                        else:
-                            st.session_state.result_queue.extend(
-                                new_results.to_dict(orient="records")
-                            )
-
-                    # 큐에서 하나를 꺼내기
-                    if st.session_state.result_queue:
-                        result = st.session_state.result_queue.pop(
-                            0
-                        )  # 큐에서 첫 번째 항목 제거
-                        if result is None:
-                            my_chat_message(
-                                "야, 추천할 레스토랑이 더 이상 없어. 다른 옵션 골라보거나 한 번 더 눌러봐!",
-                                avatar_style,
-                                seed,
-                            )
-
-                            st.error("추천할 레스토랑이 없어!")
-                        else:
-                            diner_name = result["diner_name"]
-                            diner_category_middle = result["diner_category_middle"]
-                            diner_url = result["diner_url"]
-                            diner_grade = result["diner_grade"]
-                            diner_tag = result["diner_tag"]
-                            diner_menu = result["diner_menu_name"]
-                            diner_distance = round(result["distance"] * 1000, 2)
-
-                            introduction = (
-                                f"✨ **입벌려! 추천 들어간다** ✨\n\n"
-                                f"📍 [{diner_name}]({diner_url}) ({diner_category_middle})\n"
-                                f"🗺️ 여기서 대략 **{diner_distance}m** 떨어져 있어.\n\n"
-                            )
-
-                            introduction += f"{grade_to_stars(diner_grade)}\n\n"
-
-                            if diner_tag:
-                                introduction += (
-                                    f"🔑 **주요 키워드**: {'/'.join(diner_tag)}\n"
-                                )
-                            if diner_menu:
-                                introduction += (
-                                    f"🍴 **주요 메뉴**: {'/'.join(diner_menu[:10])}\n"
-                                )
-
-                            introduction += "\n가서 맛있게 먹고 와! 😋"
-
-                            my_chat_message(introduction, avatar_style, seed)
-            else:
+            
+            elif st.session_state.search_option == "랜덤 추천 받기":
+                if st.button("랜덤 뽑기", use_container_width=True):
+                    result = self.search_manager.get_random_recommendations(
+                        st.session_state.df_filtered
+                    )
+                    if result:
+                        show_restaurant_map(result)
+            
+            else:  # 카테고리로 찾기
                 my_chat_message("뭐 먹을겨?", avatar_style, seed)
                 diner_category_lst = list(
-                    df_geo_filtered_real_review["diner_category_large"].unique()
+                    st.session_state.df_filtered["diner_category_large"].unique()
                 )
-
                 sorted_diner_category_lst = sorted(
-                    diner_category_lst, key=lambda x: PRIORITY_ORDER.get(x, 3)
+                    diner_category_lst,
+                    key=lambda x: PRIORITY_ORDER.get(x, 3)
                 )
-
+                
                 if sorted_diner_category_lst:
                     diner_category = st.multiselect(
                         label="첫번째 업태",
@@ -448,8 +528,7 @@ class What2EatApp:
                     if bool(diner_category):
                         df_geo_mid_category_filtered = category_filters(
                             diner_category,
-                            df_geo_filtered_real_review,
-                            df_geo_filtered_radius,
+                            st.session_state.df_filtered,
                         )
                         if len(df_geo_mid_category_filtered):
                             my_chat_message(
@@ -475,8 +554,8 @@ class What2EatApp:
                                 )
                                 display_results(
                                     df_geo_small_category_filtered,
-                                    radius_kilometers,
-                                    radius_distance,
+                                    st.session_state.radius_kilometers,
+                                    st.session_state.radius_distance,
                                     avatar_style,
                                     seed,
                                 )
@@ -490,19 +569,50 @@ class What2EatApp:
             my_chat_message(
                 "헉.. 주변에 맛집이 없대.. \n 다른 위치를 찾아봐", avatar_style, seed
             )
+        # 검색 초기화 버튼
+        if st.session_state.chat_step not in ["greeting", "select_radius","search_method"]:
+            if st.button("처음부터 다시 찾기"):
+                st.session_state.chat_step = "greeting"
+                st.rerun()
 
-    def run(self):
-        self.chat_page()
-        # search = st.Page(self.chat_page(), title="오늘 머먹?", icon="🧑‍🍳")
-        # # ranking = st.Page(self.ranking_page(), title="니가 가본 그집", icon="🏠")
+# ─────────────────────────────────────────────────────────────
+# 3. fragment로 나눈 뒤, 내부에서 해당 페이지 함수만 호출
+# ─────────────────────────────────────────────────────────────
+@st.fragment
+def chat_page_fragment(app: What2EatApp):
+    """chat_page 부분만 부분 재실행"""
+    st.session_state.fragment_runs += 1
+    app.chat_page()
 
-        # home = [search]
 
-        # pg = st.navigation({"Home": home})
-        # pg.run()
+@st.fragment
+def ranking_page_fragment(app: What2EatApp):
+    """ranking_page 부분만 부분 재실행"""
+    st.session_state.fragment_runs += 1
+    app.ranking_page()
 
+
+# ─────────────────────────────────────────────────────────────
+# 4. 메인 진입점 ─ 페이지 전환 & fragment 호출
+# ─────────────────────────────────────────────────────────────
+def main():
+    # 전체 앱 실행 횟수 카운트
+    st.session_state.app_runs += 1
+    app = What2EatApp()
+    st.logo(link= 'https://what2eat-chat.streamlit.app/', image=LOGO_SMALL_IMG_PATH, icon_image=LOGO_TITLE_IMG_PATH)
+    # 사이드바에서 페이지 선택
+    selected_page = st.sidebar.radio(
+        "페이지 선택",
+        ["🤤 오늘 머먹?", "🕺🏽 니가 가본 그집"]
+    )
+    
+    # 선택된 페이지에 따라 해당 함수 호출
+    if selected_page == "🤤 오늘 머먹?":
+        chat_page_fragment(app)
+    else:
+        ranking_page_fragment(app)
+    
 
 if __name__ == "__main__":
-    st.set_page_config(page_title="머먹?", page_icon=LOGO_SMALL_IMG_PATH, layout="wide")
-    app = What2EatApp()
-    app.run()
+    main()
+

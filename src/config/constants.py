@@ -1,12 +1,16 @@
 # src/config/constants.py
-import json
 
 import streamlit as st
+import os
 
-LOGO_IMG_PATH = "./static/img/what2eat-logo-middle.png"
-LOGO_SMALL_IMG_PATH = "./static/img/what2eat-logo-small.png"
-LOGO_TITLE_IMG_PATH = "./static/img/what2eat-word-logo-small.png"
-GUIDE_IMG_PATH = "./static/img/kakomap_nickname_guide.jpg"
+# 프로젝트 루트 디렉토리 경로 구하기 (src의 상위 디렉토리)
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# 이미지 경로 설정
+LOGO_IMG_PATH = os.path.join(ROOT_DIR, "static", "img", "what2eat-logo-middle.png")
+LOGO_SMALL_IMG_PATH = os.path.join(ROOT_DIR, "static", "img", "what2eat-logo-small.png")
+LOGO_TITLE_IMG_PATH = os.path.join(ROOT_DIR, "static", "img", "what2eat-word-logo-small.png")
+GUIDE_IMG_PATH = os.path.join(ROOT_DIR, "static", "img", "kakomap_nickname_guide.jpg")
 
 DEFAULT_ADDRESS_INFO_LIST = ["강남구 삼성동", 127.0567474, 37.5074423]
 
@@ -25,10 +29,9 @@ PRIORITY_ORDER = {"한식": 1, "중식": 2, "일식": 2, "양식": 2}
 
 # 등급별 색상 매핑
 GRADE_COLORS = {
-    3: "#BD2333",  # 빨강
-    2: "#84BD00",  # 초록
-    1: "#1095F9",  # 파랑
+    3: [255, 0, 0],  # 빨강
+    2: [255, 69, 0],  # 초록
+    1: [255, 140, 0],  # 파랑
 }
 
 GRADE_MAP = {"🌟": 1, "🌟🌟": 2, "🌟🌟🌟": 3}
-    

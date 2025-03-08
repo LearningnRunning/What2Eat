@@ -1,7 +1,8 @@
 # src/uils/ui_components.py
 import random
-
+import pydeck as pdk
 import streamlit as st
+import pandas as pd
 from streamlit_chat import message
 from utils.data_processing import grade_to_stars
 
@@ -23,11 +24,139 @@ def my_chat_message(message_txt, choiced_avatar_style, choiced_seed):
     message_counter += 1
     return message(message_txt, avatar_style=choiced_avatar_style, seed=choiced_seed, key=f"message_{message_counter}")
 
+@st.dialog("주변 맛집 지도")
+def display_maps(df_filtered):
+
+    # 현재 위치 데이터
+    current_location = pd.DataFrame({
+        'lat': [st.session_state.user_lat],
+        'lon': [st.session_state.user_lon],
+        'name': ['현재 위치'],
+        'color': [[0, 0, 255]],  # 파란색(현재 위치)
+        'url': ['']  # 현재 위치는 URL 없음
+    })
+
+    # 음식점 데이터 준비 (순위별로 다른 색상)
+    restaurants = []
+    for idx, row in df_filtered.iterrows():
+        grade_num = row['diner_grade']
+        if grade_num >= 3:
+            color = [255, 0, 0]  # 빨간색
+        elif grade_num == 2:
+            color = [255, 69, 0]  # 주황빨간색
+        else:
+            color = [255, 140, 0]  # 주황색
+
+        restaurants.append({
+            'lat': row['diner_lat'],
+            'lon': row['diner_lon'],
+            'name': f"{row['diner_name']}",
+            'color': color,
+            'url': row['diner_url']
+        })
+
+    # 데이터프레임 생성
+    restaurant_df = pd.DataFrame(restaurants)
+    map_data = pd.concat([current_location, restaurant_df])
+
+    # 지도 중심점 계산
+    center_lat = (map_data['lat'].max() + map_data['lat'].min()) / 2
+    center_lon = (map_data['lon'].max() + map_data['lon'].min()) / 2
+
+    # 레이어 설정
+    layer = pdk.Layer(
+        "ScatterplotLayer",
+        data=map_data,
+        get_position=["lon", "lat"],
+        get_fill_color="color",
+        get_radius=2,
+        pickable=True,
+        radiusScale=2,
+        onClick=True,
+        auto_highlight=True,
+        highlight_color=[255, 255, 0, 100],  # 하이라이트 색상
+        hover_distance=100  # 마우스오버 감지 거리
+    )
+
+    # 지도 설정
+    view_state = pdk.ViewState(
+        latitude=center_lat,
+        longitude=center_lon,
+        zoom=16,
+        pitch=50
+    )
+
+    # 툴팁 HTML 템플릿
+    tooltip_html = """
+    <div style="
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        padding: 10px;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+    ">
+        <strong>{name}</strong><br/>
+        <a href="{url}" target="_blank" 
+           style="
+               display: inline-block;
+               margin-top: 5px;
+               padding: 5px 10px;
+               background-color: #FEE500;
+               color: #000;
+               text-decoration: none;
+               border-radius: 5px;
+               font-weight: bold;
+           "
+        >
+            카카오맵에서 보기
+        </a>
+    </div>
+    """
+
+    # 지도 렌더링
+    deck = pdk.Deck(
+        layers=[layer],
+        initial_view_state=view_state,
+        tooltip={
+            "html": tooltip_html,
+            "style": {
+                "position": "fixed",
+                "right": "10px",
+                "top": "10px",
+                "z-index": "10000",
+                "pointer-events": "auto",  # 툴팁 내 클릭 가능하도록 설정
+                "display": "block"  # 항상 표시
+            }
+        },
+        map_style="mapbox://styles/mapbox/light-v10"
+    )
+
+    st.pydeck_chart(deck, use_container_width=True)
+
+    # 범례 표시
+    st.write("🎯 **색깔별 쩝슐랭 표시**")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("🔴  🌟🌟🌟")
+    with col2:
+        st.markdown("🟠  🌟🌟")
+    with col3:
+        st.markdown("🟡  🌟")
+
+    st.markdown("💡 **마커를 더블 클릭하면 카카오맵으로 이동합니다**")
+
+
+
 def display_results(df_filtered, radius_int, radius_str, avatar_style, seed):
     df_filtered = df_filtered.sort_values(by="bayesian_score", ascending=False)
     if not len(df_filtered):
         my_chat_message("헉.. 주변에 찐맛집이 없대.. \n 다른 메뉴를 골라봐", avatar_style, seed)
     else:
+        # 지도로 보기 버튼 추가
+        if st.button("📍 모든 음식점 지도로 보기"):
+            display_maps(df_filtered)
         # 나쁜 리뷰와 좋은 리뷰를 분리
         bad_reviews = []
         good_reviews = []

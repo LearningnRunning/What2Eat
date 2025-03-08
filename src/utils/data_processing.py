@@ -31,9 +31,11 @@ def select_radius(avatar_style, seed):
     radius_distance = st.selectbox(
         "어디", ["300m", "500m", "1km", "3km", "10km"], label_visibility="hidden"
     )
-    return {"300m": 0.3, "500m": 0.5, "1km": 1, "3km": 3, "10km": 10}[
+    st.session_state.radius_kilometers ={"300m": 0.3, "500m": 0.5, "1km": 1, "3km": 3, "10km": 10}[
         radius_distance
-    ], radius_distance
+    ]
+    st.session_state.radius_distance = radius_distance
+    return st.session_state.radius_kilometers, st.session_state.radius_distance
     
     
 # 색상 코드 (#FF5733)를 [R, G, B, A] 형식으로 변환하는 함수
@@ -127,7 +129,7 @@ def recommend_items_model(user_id, algo, trainset, num_recommendations=5):
 
 
 @st.cache_data
-def category_filters(diner_category, df_diner_real_review, df_diner):
+def category_filters(diner_category, df_diner_real_review):
     category_filted_df = df_diner_real_review.query(f"diner_category_large in @diner_category")
 
     return category_filted_df
