@@ -313,6 +313,9 @@ class What2EatApp:
         )
 
         if city_label:
+            filtered_zone_df["diner_category_large"] = filtered_zone_df[
+                "diner_category_large"
+            ].fillna("기타")
             if city_label == selected_zone_all:
                 filtered_city_df = filtered_zone_df
             else:
@@ -321,9 +324,7 @@ class What2EatApp:
                 ]
 
             # 중간 카테고리 선택 및 필터링
-            available_categories = (
-                filtered_city_df["diner_category_large"].dropna().unique()
-            )
+            available_categories = filtered_city_df["diner_category_large"].unique()
             selected_category = st.selectbox(
                 "중간 카테고리를 선택하세요", ["전체"] + list(available_categories)
             )
@@ -335,7 +336,7 @@ class What2EatApp:
 
             # 세부 카테고리 선택 및 필터링
             available_small_categories = (
-                filtered_city_df["diner_category_middle"].dropna().unique()
+                filtered_city_df["diner_category_middle"].fillna("기타").unique()
             )
             selected_small_category = st.selectbox(
                 "세부 카테고리를 선택하세요",
