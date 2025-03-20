@@ -136,10 +136,9 @@ def category_filters(diner_category, df_diner_real_review):
 
 # 랜덤 뽑기 함수
 @st.cache_data
-def pick_random_diners(df, num_to_select=5):
-    print('df', df)
+def pick_random_diners(df, num_to_select=25):
+
     high_grade_diners = df[df["diner_grade"] >= 2]
-    print('high_grade_diners', high_grade_diners)
     # 조건: 이미 선택된 카테고리는 제외
     available_diners = high_grade_diners[
         ~high_grade_diners["diner_category_small"].isin(st.session_state.previous_category_small)

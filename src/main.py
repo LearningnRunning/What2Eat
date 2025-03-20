@@ -156,14 +156,12 @@ def show_restaurant_map(restaurant):
             st.session_state.user_lon = DEFAULT_ADDRESS_INFO_LIST[1]
 
     # 현재 위치와 음식점 위치를 포함하는 데이터 생성
-    map_data = pd.DataFrame(
-        {
-            "lat": [st.session_state.user_lat, restaurant["diner_lat"]],
-            "lon": [st.session_state.user_lon, restaurant["diner_lon"]],
-            "name": ["현재 위치", restaurant["diner_name"]],
-            "color": [[0, 0, 255], [255, 0, 0]],  # 파란색(현재위치), 빨간색(음식점)
-        }
-    )
+    map_data = pd.DataFrame({
+        "lat": [st.session_state.user_lat, restaurant["diner_lat"]],
+        "lon": [st.session_state.user_lon, restaurant["diner_lon"]],
+        "name": ["현재 위치", restaurant["diner_name"]],
+        "color": [[0, 0, 255], [255, 0, 0]],  # 파란색(현재위치), 빨간색(음식점)
+    })
 
     # 지도 설정
     view_state = pdk.ViewState(
@@ -622,6 +620,12 @@ def main():
         link="https://what2eat-chat.streamlit.app/",
         image=LOGO_SMALL_IMG_PATH,
         icon_image=LOGO_TITLE_IMG_PATH,
+    )
+    st.set_page_config(
+        page_title="머먹?",
+        page_icon="🍽️",
+        layout="wide",
+        initial_sidebar_state="expanded",
     )
     # 사이드바에서 페이지 선택
     selected_page = st.sidebar.radio(

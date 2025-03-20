@@ -66,7 +66,6 @@ def search_your_address():
 
     search_region_text = st.text_input("주소나 키워드로 입력해줘")
     search_clicked = st.button("검색")
-    print('search_region_text', search_region_text)
     
     # 검색 버튼을 클릭했거나 새로운 검색어로 엔터를 눌렀을 때
     if search_clicked or (
