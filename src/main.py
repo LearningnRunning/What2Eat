@@ -615,18 +615,20 @@ def ranking_page_fragment(app: What2EatApp):
 def main():
     # 전체 앱 실행 횟수 카운트
     st.session_state.app_runs += 1
-    app = What2EatApp()
-    st.logo(
-        link="https://what2eat-chat.streamlit.app/",
-        image=LOGO_SMALL_IMG_PATH,
-        icon_image=LOGO_TITLE_IMG_PATH,
-    )
     st.set_page_config(
         page_title="머먹?",
         page_icon="🍽️",
         layout="wide",
         initial_sidebar_state="expanded",
     )
+    st.logo(
+        link="https://what2eat-chat.streamlit.app/",
+        image=LOGO_SMALL_IMG_PATH,
+        icon_image=LOGO_TITLE_IMG_PATH,
+    )
+
+    app = What2EatApp()
+
     # 사이드바에서 페이지 선택
     selected_page = st.sidebar.radio(
         "페이지 선택", ["🤤 오늘 머먹?", "🕺🏽 니가 가본 그집"]
