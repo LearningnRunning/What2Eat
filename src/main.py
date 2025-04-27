@@ -446,7 +446,22 @@ class What2EatApp:
             df_geo_filtered = get_filtered_data(
                 self.df_diner, st.session_state.user_lat, st.session_state.user_lon
             )
+
             df_geo_filtered = df_geo_filtered[(df_geo_filtered["diner_grade"].notna())]
+
+            # diner_grade 값 확인 (1 이상인지)
+            df_quality = df_geo_filtered[df_geo_filtered["diner_grade"] >= 1]
+
+            # 찐맛집(diner_grade >= 1)이 있는지 확인
+            if len(df_quality) == 0:
+                my_chat_message(
+                    "찐맛집이 근처에 없어... 😢\n반경을 좀 더 넓게 설정해볼까?",
+                    avatar_style,
+                    seed,
+                )
+                return
+
+            df_geo_filtered = df_quality
 
             if len(df_geo_filtered):
                 df_geo_filtered_radius = df_geo_filtered[
