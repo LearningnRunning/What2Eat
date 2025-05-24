@@ -1,43 +1,78 @@
 # src/utils/data_processing.py
 
-import math
-import random
 from math import atan2, cos, radians, sin, sqrt
 
-import folium
 import matplotlib.colors as mcolors  # 색상 변환에 사용
 import pandas as pd
 import streamlit as st
-from folium.plugins import MarkerCluster
+
+
+# 리스트나 기타 iterable 객체를 안전하게 처리하는 함수 추가
+def safe_item_access(item, index=None):
+    """
+    리스트나 기타 iterable 객체를 안전하게 처리하는 함수
+
+    Args:
+        item: 처리할 아이템 (리스트, 문자열 등)
+        index: 리스트인 경우 접근할 인덱스 (None이면 모든 요소 접근)
+
+    Returns:
+        안전하게 처리된 아이템
+    """
+    if item is None:
+        return ""
+
+    # 리스트인 경우
+    if isinstance(item, list):
+        if index is not None:
+            # 특정 인덱스까지 접근 (ex: [:3])
+            items = item[:index]
+        else:
+            # 전체 리스트 사용
+            items = item
+        # 리스트 요소들을 문자열로 변환하여 조인
+        return "/".join(str(i) for i in items)
+
+    # 문자열 또는 기타 타입의 경우 그대로 반환
+    return str(item)
 
 
 @st.cache_data
 def get_filtered_data(df, user_lat, user_lon, max_radius=30):
     df["distance"] = df.apply(
-        lambda row: haversine(user_lat, user_lon, row["diner_lat"], row["diner_lon"]), axis=1
+        lambda row: haversine(user_lat, user_lon, row["diner_lat"], row["diner_lon"]),
+        axis=1,
     )
 
     # 거리 계산 및 필터링
     filtered_df = df[df["distance"] <= max_radius]
     return filtered_df
 
+
 @st.cache_data
 def category_filters(diner_category, df_diner_real_review, df_diner):
-    category_filted_df = df_diner_real_review.query(f"diner_category_large in @diner_category")
+    category_filted_df = df_diner_real_review.query(
+        "diner_category_large in @diner_category"
+    )
 
     return category_filted_df
+
 
 def select_radius(avatar_style, seed):
     radius_distance = st.selectbox(
         "어디", ["300m", "500m", "1km", "3km", "10km"], label_visibility="hidden"
     )
-    st.session_state.radius_kilometers ={"300m": 0.3, "500m": 0.5, "1km": 1, "3km": 3, "10km": 10}[
-        radius_distance
-    ]
+    st.session_state.radius_kilometers = {
+        "300m": 0.3,
+        "500m": 0.5,
+        "1km": 1,
+        "3km": 3,
+        "10km": 10,
+    }[radius_distance]
     st.session_state.radius_distance = radius_distance
     return st.session_state.radius_kilometers, st.session_state.radius_distance
-    
-    
+
+
 # 색상 코드 (#FF5733)를 [R, G, B, A] 형식으로 변환하는 함수
 def hex_to_rgba(hex_color, alpha=160):
     rgb = mcolors.hex2color(hex_color)  # (R, G, B) 값 반환 (0~1)
@@ -63,10 +98,13 @@ def haversine(lat1, lon1, lat2, lon2):
     return distance
 
 
-def filter_recommendations_by_distance_memory(recommended_items_df, user_lat, user_lon, radius):
+def filter_recommendations_by_distance_memory(
+    recommended_items_df, user_lat, user_lon, radius
+):
     # 거리 계산
     distances = recommended_items_df.apply(
-        lambda row: haversine(user_lat, user_lon, row["diner_lat"], row["diner_lon"]), axis=1
+        lambda row: haversine(user_lat, user_lon, row["diner_lat"], row["diner_lon"]),
+        axis=1,
     )
     recommended_items_df["distance"] = distances
     # 반경 내의 아이템 필터링
@@ -79,9 +117,13 @@ def predict_rating(user_id, item_id, algo):
     return prediction.est
 
 
-def recommend_items(user_id, user_item_matrix, user_similarity_df, num_recommendations=10):
+def recommend_items(
+    user_id, user_item_matrix, user_similarity_df, num_recommendations=10
+):
     # 해당 사용자의 유사도 가져오기
-    similar_users = user_similarity_df[user_id].drop(user_id).sort_values(ascending=False)
+    similar_users = (
+        user_similarity_df[user_id].drop(user_id).sort_values(ascending=False)
+    )
 
     # 유사한 사용자가 선호하는 아이템 추출
     similar_users_indices = similar_users.index
@@ -92,11 +134,18 @@ def recommend_items(user_id, user_item_matrix, user_similarity_df, num_recommend
 
     # 이미 평가한 아이템 제거
     user_rated_items = user_item_matrix.loc[user_id].dropna().index
-    recommendation_scores = recommendation_scores.drop(user_rated_items, errors="ignore")
+    recommendation_scores = recommendation_scores.drop(
+        user_rated_items, errors="ignore"
+    )
 
     # 상위 추천 아이템 반환
-    top_items = recommendation_scores.sort_values(ascending=False).head(num_recommendations)
-    top_items_df = pd.DataFrame({"diner_idx": top_items.index, "score": top_items.values})
+    top_items = recommendation_scores.sort_values(ascending=False).head(
+        num_recommendations
+    )
+    top_items_df = pd.DataFrame({
+        "diner_idx": top_items.index,
+        "score": top_items.values,
+    })
 
     return top_items_df
 
@@ -130,18 +179,22 @@ def recommend_items_model(user_id, algo, trainset, num_recommendations=5):
 
 @st.cache_data
 def category_filters(diner_category, df_diner_real_review):
-    category_filted_df = df_diner_real_review.query(f"diner_category_large in @diner_category")
+    category_filted_df = df_diner_real_review.query(
+        "diner_category_large in @diner_category"
+    )
 
     return category_filted_df
+
 
 # 랜덤 뽑기 함수
 @st.cache_data
 def pick_random_diners(df, num_to_select=25):
-
     high_grade_diners = df[df["diner_grade"] >= 2]
     # 조건: 이미 선택된 카테고리는 제외
     available_diners = high_grade_diners[
-        ~high_grade_diners["diner_category_small"].isin(st.session_state.previous_category_small)
+        ~high_grade_diners["diner_category_small"].isin(
+            st.session_state.previous_category_small
+        )
     ]
 
     # 모든 카테고리가 선택된 경우 초기화
@@ -156,13 +209,16 @@ def pick_random_diners(df, num_to_select=25):
         available_diners = high_grade_diners
 
     # 랜덤으로 num_to_select개 뽑기
-    selected_diners = available_diners.sample(n=min(num_to_select, len(available_diners)))
+    selected_diners = available_diners.sample(
+        n=min(num_to_select, len(available_diners))
+    )
     st.session_state.previous_category_small.extend(
         selected_diners["diner_category_small"].tolist()
     )
     st.session_state.consecutive_failures = 0  # 성공 시 실패 횟수 초기화
 
     return selected_diners
+
 
 # 메뉴 검색 함수 정의
 def search_menu(row, search_term):

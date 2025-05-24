@@ -5,7 +5,7 @@ import pandas as pd
 import pydeck as pdk
 import streamlit as st
 from streamlit_chat import message
-from utils.data_processing import grade_to_stars
+from utils.data_processing import grade_to_stars, safe_item_access
 
 
 @st.cache_data
@@ -197,9 +197,12 @@ def display_results(df_filtered, radius_int, radius_str, avatar_style, seed):
         # 나쁜 리뷰와 좋은 리뷰를 분리
         bad_reviews = []
         good_reviews = []
-        df_filtered["diner_category_middle"].fillna(
-            df_filtered["diner_category_large"], inplace=True
-        )
+
+        # 문제가 되는 부분 수정 - copy 생성 후 fillna 적용
+        df_filtered_copy = df_filtered.copy()
+        df_filtered_copy["diner_category_middle"] = df_filtered_copy[
+            "diner_category_middle"
+        ].fillna(df_filtered_copy["diner_category_large"])
 
         for _, row in df_sorted.iterrows():
             if (
@@ -215,6 +218,7 @@ def display_results(df_filtered, radius_int, radius_str, avatar_style, seed):
 
         # 좋은 리뷰 처리 (이미 정렬되어 있음)
         for row in good_reviews:
+            # 리스트 처리를 위한 안전 처리 추가
             introduction += generate_introduction(
                 row["diner_idx"],
                 row["diner_name"],
@@ -259,15 +263,15 @@ def generate_introduction(
         introduction += f"🍽️ 쩝쩝상위 {diner_grade}%야!\n"
         introduction += f"👍 추천지수: {recommend_score}%\n"
         if diner_tags:
-            introduction += f"🔑 키워드: {'/'.join(diner_tags)}\n"
+            introduction += f"🔑 키워드: {safe_item_access(diner_tags)}\n"
         if diner_menus:
-            introduction += f"🍴 메뉴: {'/'.join(diner_menus[:3])}\n"
+            introduction += f"🍴 메뉴: {safe_item_access(diner_menus, 3)}\n"
     else:
         introduction += f"{grade_to_stars(diner_grade)}"
         if diner_tags:
-            introduction += f"🔑 키워드: {'/'.join(diner_tags[:5])}\n"
+            introduction += f"🔑 키워드: {safe_item_access(diner_tags, 5)}\n"
         if diner_menus:
-            introduction += f"🍴 메뉴: {'/'.join(diner_menus[:3])}\n"
+            introduction += f"🍴 메뉴: {safe_item_access(diner_menus, 3)}\n"
 
     # 거리 정보 추가
     if radius_kilometers >= 0.5:

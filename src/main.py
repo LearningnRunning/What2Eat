@@ -355,11 +355,13 @@ class What2EatApp:
             st.subheader(
                 f"{selected_category if selected_category != '전체' else '전체 중간 카테고리'} 카테고리 ({selected_small_category if selected_small_category != '전체' else '전체'}) 랭킹"
             )
-            filtered_city_df["diner_category_middle"].fillna(
-                filtered_city_df["diner_category_large"], inplace=True
-            )
+            # 수정: 복사본을 만들고 fillna 적용
+            filtered_city_df_copy = filtered_city_df.copy()
+            filtered_city_df_copy["diner_category_middle"] = filtered_city_df_copy[
+                "diner_category_middle"
+            ].fillna(filtered_city_df_copy["diner_category_large"])
 
-            ranked_df = filtered_city_df.sort_values(
+            ranked_df = filtered_city_df_copy.sort_values(
                 by="bayesian_score", ascending=False
             )[
                 [
