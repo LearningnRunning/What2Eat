@@ -1,6 +1,7 @@
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
+import streamlit.components.v1 as components
 from config.constants import (
     DEFAULT_ADDRESS_INFO_LIST,
     GRADE_MAP,
@@ -22,6 +23,19 @@ from utils.data_processing import (
 )
 from utils.geolocation import geocode, search_your_address
 from utils.ui_components import choice_avatar, display_results, my_chat_message
+
+components.html(
+    """
+    <script type="text/javascript">
+        (function(c,l,a,r,i,t,y){
+            c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+            y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+        })(window, document, "clarity", "script", "s49gcpsipg");
+    </script>
+    """,
+    height=0,  # 화면에 표시되지 않도록 설정
+)
 
 # ─────────────────────────────────────────────────────────────
 # 0. Fragment 재실행 여부를 확인하기 위한 session_state 설정
