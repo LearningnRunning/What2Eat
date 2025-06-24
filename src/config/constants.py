@@ -24,6 +24,9 @@ MODEL_PATH = "./data/model_data"
 KAKAO_API_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 KAKAO_API_HEADERS = {"Authorization": f"KakaoAK {st.secrets['REST_API_KEY']}"}
 
+GOOGLE_ANALYTIC_ID = st.secrets["GOOGLE_ANALYTIC_ID"]
+MICROSOFT_CLARITY_ID = st.secrets["MICROSOFT_CLARITY_ID"]
+
 # 우선순위를 정의
 PRIORITY_ORDER = {"한식": 1, "중식": 2, "일식": 2, "양식": 2}
 
