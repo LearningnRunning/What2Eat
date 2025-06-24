@@ -1,7 +1,6 @@
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
-import streamlit.components.v1 as components
 from config.constants import (
     DEFAULT_ADDRESS_INFO_LIST,
     GRADE_MAP,
@@ -45,7 +44,7 @@ script = f"""
 </script>
 """
 
-components.html(script, height=0)
+st.markdown(script, unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────
