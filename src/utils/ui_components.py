@@ -5,7 +5,9 @@ import pandas as pd
 import pydeck as pdk
 import streamlit as st
 from streamlit_chat import message
+
 from utils.data_processing import grade_to_stars, safe_item_access
+from utils.firebase_logger import get_firebase_logger
 
 
 @st.cache_data
@@ -41,13 +43,15 @@ def my_chat_message(message_txt, choiced_avatar_style, choiced_seed):
 @st.dialog("주변 맛집 지도")
 def display_maps(df_filtered):
     # 현재 위치 데이터
-    current_location = pd.DataFrame({
-        "lat": [st.session_state.user_lat],
-        "lon": [st.session_state.user_lon],
-        "name": ["현재 위치"],
-        "color": [[0, 0, 255]],  # 파란색(현재 위치)
-        "url": [""],  # 현재 위치는 URL 없음
-    })
+    current_location = pd.DataFrame(
+        {
+            "lat": [st.session_state.user_lat],
+            "lon": [st.session_state.user_lon],
+            "name": ["현재 위치"],
+            "color": [[0, 0, 255]],  # 파란색(현재 위치)
+            "url": [""],  # 현재 위치는 URL 없음
+        }
+    )
 
     # 음식점 데이터 준비 (순위별로 다른 색상)
     restaurants = []
@@ -60,13 +64,15 @@ def display_maps(df_filtered):
         else:
             color = [255, 140, 0]  # 주황색
 
-        restaurants.append({
-            "lat": row["diner_lat"],
-            "lon": row["diner_lon"],
-            "name": f"{row['diner_name']}",
-            "color": color,
-            "url": row["diner_url"],
-        })
+        restaurants.append(
+            {
+                "lat": row["diner_lat"],
+                "lon": row["diner_lon"],
+                "name": f"{row['diner_name']}",
+                "color": color,
+                "url": row["diner_url"],
+            }
+        )
 
     # 데이터프레임 생성
     restaurant_df = pd.DataFrame(restaurants)
@@ -167,6 +173,17 @@ def display_results(df_filtered, radius_int, radius_str, avatar_style, seed):
     else:
         # 지도로 보기 버튼 추가
         if st.button("📍 모든 음식점 지도로 보기"):
+            # 지도 보기 로그 (강화된 버전)
+            logger = get_firebase_logger()
+            if "user_info" in st.session_state and st.session_state.user_info:
+                uid = st.session_state.user_info.get("localId")
+                if uid:
+                    logger.log_map_view(
+                        uid=uid,
+                        restaurants_count=len(df_filtered),
+                        radius_km=radius_int,
+                        from_page="chat",
+                    )
             display_maps(df_filtered)
 
         # 정렬 옵션 선택
@@ -176,6 +193,19 @@ def display_results(df_filtered, radius_int, radius_str, avatar_style, seed):
             horizontal=True,
             key="sort_option",
         )
+
+        # 정렬 옵션 변경 로깅
+        if "previous_sort_option" not in st.session_state:
+            st.session_state.previous_sort_option = sort_option
+        elif st.session_state.previous_sort_option != sort_option:
+            logger = get_firebase_logger()
+            if "user_info" in st.session_state and st.session_state.user_info:
+                uid = st.session_state.user_info.get("localId")
+                if uid:
+                    logger.log_sort_option_change(
+                        uid=uid, sort_option=sort_option, from_page="chat"
+                    )
+            st.session_state.previous_sort_option = sort_option
 
         # 선택한 옵션에 따라 정렬
         if sort_option == "리뷰 많은 순":
@@ -222,6 +252,7 @@ def display_results(df_filtered, radius_int, radius_str, avatar_style, seed):
             introduction += generate_introduction(
                 row["diner_idx"],
                 row["diner_name"],
+                row["diner_review_cnt"],
                 radius_int,
                 int(row["distance"] * 1000),
                 row["diner_category_middle"],
@@ -238,10 +269,43 @@ def display_results(df_filtered, radius_int, radius_str, avatar_style, seed):
         # 최종 메시지 전송
         my_chat_message(introduction, avatar_style, seed)
 
+        # 음식점별 클릭 버튼 추가 (로깅을 위해)
+        st.subheader("🔗 음식점 바로가기")
+
+        # 좋은 리뷰 음식점들
+        for idx, row in enumerate(good_reviews[:5]):  # 상위 5개만 표시
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write(f"**{row['diner_name']}** - {row['diner_category_middle']}")
+            with col2:
+                if st.button("보러가기", key=f"visit_{idx}_{row['diner_name']}"):
+                    # 음식점 클릭 로깅 (강화된 버전)
+                    logger = get_firebase_logger()
+                    if "user_info" in st.session_state and st.session_state.user_info:
+                        uid = st.session_state.user_info.get("localId")
+                        if uid:
+                            logger.log_restaurant_click(
+                                uid=uid,
+                                restaurant_name=row["diner_name"],
+                                restaurant_url=f"https://place.map.kakao.com/{row['diner_idx']}",
+                                restaurant_idx=str(row.get("diner_idx", "")),
+                                category=row["diner_category_middle"],
+                                location=None,  # 지역 정보가 없는 경우
+                                grade=row.get("diner_grade"),
+                                review_count=row.get("diner_review_cnt"),
+                                distance=row.get("distance"),
+                                from_page="chat_results",
+                            )
+                    # 새 탭에서 음식점 페이지 열기
+                    st.link_button(
+                        "음식점 보기", f"https://place.map.kakao.com/{row['diner_idx']}"
+                    )
+
 
 def generate_introduction(
     diner_idx,
     diner_name,
+    diner_review_cnt,
     radius_kilometers,
     distance,
     diner_category_small,
@@ -262,12 +326,16 @@ def generate_introduction(
     if recommend_score is not None:
         introduction += f"🍽️ 쩝쩝상위 {diner_grade}%야!\n"
         introduction += f"👍 추천지수: {recommend_score}%\n"
+        introduction += f"👍 리뷰 수: {diner_review_cnt}\n"
         if diner_tags:
             introduction += f"🔑 키워드: {safe_item_access(diner_tags)}\n"
         if diner_menus:
             introduction += f"🍴 메뉴: {safe_item_access(diner_menus, 3)}\n"
     else:
         introduction += f"{grade_to_stars(diner_grade)}"
+        if diner_review_cnt:
+            introduction += f"👍 리뷰 수: {diner_review_cnt}\n"
+
         if diner_tags:
             introduction += f"🔑 키워드: {safe_item_access(diner_tags, 5)}\n"
         if diner_menus:

@@ -50,7 +50,7 @@ def get_filtered_data(df, user_lat, user_lon, max_radius=30):
 
 
 @st.cache_data
-def category_filters(diner_category, df_diner_real_review, df_diner):
+def category_filters(diner_category, df_diner_real_review):
     category_filted_df = df_diner_real_review.query(
         "diner_category_large in @diner_category"
     )
@@ -142,10 +142,12 @@ def recommend_items(
     top_items = recommendation_scores.sort_values(ascending=False).head(
         num_recommendations
     )
-    top_items_df = pd.DataFrame({
-        "diner_idx": top_items.index,
-        "score": top_items.values,
-    })
+    top_items_df = pd.DataFrame(
+        {
+            "diner_idx": top_items.index,
+            "score": top_items.values,
+        }
+    )
 
     return top_items_df
 
@@ -175,15 +177,6 @@ def recommend_items_model(user_id, algo, trainset, num_recommendations=5):
     top_items_df = pd.DataFrame(top_items, columns=["diner_idx", "score"])
 
     return top_items_df
-
-
-@st.cache_data
-def category_filters(diner_category, df_diner_real_review):
-    category_filted_df = df_diner_real_review.query(
-        "diner_category_large in @diner_category"
-    )
-
-    return category_filted_df
 
 
 # 랜덤 뽑기 함수
