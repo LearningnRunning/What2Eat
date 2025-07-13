@@ -154,14 +154,19 @@ class FirebaseAuth:
                 error_message = error_data.get("error", {}).get(
                     "message", "알 수 없는 오류"
                 )
-                if "INVALID_PASSWORD" in error_message:
+                if "INVALID_LOGIN_CREDENTIALS" in error_message:
+                    return {
+                        "success": False,
+                        "error": "잘못된 이메일 또는 비밀번호입니다.",
+                    }
+                elif "INVALID_PASSWORD" in error_message:
                     return {"success": False, "error": "잘못된 비밀번호입니다."}
                 elif "EMAIL_NOT_FOUND" in error_message:
                     return {"success": False, "error": "존재하지 않는 이메일입니다."}
                 elif "INVALID_EMAIL" in error_message:
                     return {"success": False, "error": "잘못된 이메일 형식입니다."}
                 else:
-                    return {"success": False, "error": f"로그인 실패: {error_message}"}
+                    return {"success": False, "error": f"{error_message}"}
             return {"success": False, "error": f"네트워크 오류: {str(e)}"}
         except Exception as e:
             return {"success": False, "error": f"인증 실패: {str(e)}"}
