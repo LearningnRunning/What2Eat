@@ -29,7 +29,7 @@ def login_page_fragment():
     with col2:
         st.image(LOGO_TITLE_IMG_PATH, width=300)
 
-    st.markdown("---")
+    # st.markdown("---")
 
     # # 앱 소개
     # st.markdown("""

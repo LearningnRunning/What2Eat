@@ -299,6 +299,67 @@ class FirebaseLogger:
 
         return self._log_to_collection(uid, collection_name, activity_type, detail)
 
+    # ========== 사용자 위치 관리 ==========
+    def save_user_location(
+        self, uid: str, address: str, lat: float, lon: float
+    ) -> bool:
+        """사용자 위치 정보를 Firestore에 저장"""
+        if not self.is_available():
+            return False
+
+        try:
+            user_ref = self.db.collection("users").document(uid)
+
+            location_data = {
+                "address": address,
+                "lat": lat,
+                "lon": lon,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            }
+
+            user_ref.set({"last_location": location_data}, merge=True)
+
+            # 위치 저장 로그도 남기기
+            self._log_to_collection(
+                uid,
+                "navigation_logs",
+                "location_saved",
+                {"address": address, "coordinates": {"lat": lat, "lon": lon}},
+            )
+
+            return True
+
+        except Exception as e:
+            st.error(f"❌ 사용자 위치 저장 중 오류가 발생했습니다: {str(e)}")
+            return False
+
+    def get_user_location(self, uid: str) -> Dict[str, Any]:
+        """사용자의 마지막 위치 정보를 Firestore에서 불러오기"""
+        if not self.is_available():
+            return None
+
+        try:
+            user_ref = self.db.collection("users").document(uid)
+            user_doc = user_ref.get()
+
+            if user_doc.exists:
+                user_data = user_doc.to_dict()
+                last_location = user_data.get("last_location")
+
+                if last_location:
+                    return {
+                        "address": last_location.get("address"),
+                        "lat": last_location.get("lat"),
+                        "lon": last_location.get("lon"),
+                        "updated_at": last_location.get("updated_at"),
+                    }
+
+            return None
+
+        except Exception as e:
+            st.error(f"❌ 사용자 위치 불러오기 중 오류가 발생했습니다: {str(e)}")
+            return None
+
     # ========== 조회 메서드 ==========
     def get_user_logs(
         self, uid: str, limit: int = 10, collection_name: str = None

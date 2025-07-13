@@ -3,10 +3,14 @@
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
-from config.constants import DEFAULT_ADDRESS_INFO_LIST
 from streamlit_geolocation import streamlit_geolocation
 
-from utils.geolocation import geocode, search_your_address
+from utils.geolocation import (
+    geocode,
+    get_user_default_location,
+    save_user_location,
+    search_your_address,
+)
 
 
 @st.dialog("음식점 위치")
@@ -36,8 +40,10 @@ def show_restaurant_map(restaurant):
             st.session_state.user_lat = location["latitude"]
             st.session_state.user_lon = location["longitude"]
         else:
-            st.session_state.user_lat = DEFAULT_ADDRESS_INFO_LIST[2]
-            st.session_state.user_lon = DEFAULT_ADDRESS_INFO_LIST[1]
+            # 사용자 기본 위치 사용
+            default_location = get_user_default_location()
+            st.session_state.user_lat = default_location[2]
+            st.session_state.user_lon = default_location[1]
 
     # 현재 위치와 음식점 위치를 포함하는 데이터 생성
     map_data = pd.DataFrame(
@@ -101,6 +107,14 @@ def change_location():
                 st.session_state.address = geocode(
                     st.session_state.user_lon, st.session_state.user_lat
                 )
+
+                # Firestore에 위치 저장
+                save_user_location(
+                    st.session_state.address,
+                    st.session_state.user_lat,
+                    st.session_state.user_lon,
+                )
+
                 st.success("✅ 위치를 찾았습니다!")
                 st.rerun()
     elif option == "키워드로 검색으로 찾기(강남역 or 강남대로 328)":
