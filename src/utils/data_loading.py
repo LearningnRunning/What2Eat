@@ -7,8 +7,9 @@ import pickle
 
 import pandas as pd
 import streamlit as st
-from config.constants import DATA_PATH, MODEL_PATH
 from PIL import Image
+
+from config.constants import DATA_PATH, MODEL_PATH
 
 
 def safe_string_to_list(input_string, column_name):
@@ -23,6 +24,14 @@ def safe_string_to_list(input_string, column_name):
         list: 변환된 리스트 (변환 실패 시 빈 리스트 반환)
     """
     try:
+        # null이나 None 값 처리
+        if pd.isna(input_string) or input_string is None:
+            return []
+        
+        # 문자열이 아닌 경우 문자열로 변환
+        if not isinstance(input_string, str):
+            input_string = str(input_string)
+        
         # 문자열을 리스트로 안전하게 변환
         input_list = ast.literal_eval(input_string)
 
@@ -40,22 +49,37 @@ def safe_string_to_list(input_string, column_name):
 
 @st.cache_data
 def load_static_data(logo_img_path, logo_small_img_path, guide_image_path):
-    # Get the first CSV file in the directory
+    # Get CSV files and filter for whatToEat_DB files
     csv_files = glob.glob(DATA_PATH)
     if not csv_files:
         raise FileNotFoundError(f"No CSV files found in {DATA_PATH}")
 
-    first_csv_file = csv_files[0]
+    # Filter for files containing 'whatToEat_DB'
+    whattoeat_files = [f for f in csv_files if 'whatToEat_DB' in os.path.basename(f)]
+    if not whattoeat_files:
+        raise FileNotFoundError(f"No whatToEat_DB CSV files found in {DATA_PATH}")
+    
+    # Sort by filename to get the most recent date (assuming YYYYMMDD format in filename)
+    whattoeat_files.sort(reverse=True)  # 최신 날짜가 첫 번째가 되도록 정렬
+    first_csv_file = whattoeat_files[0]
+    print(f"Loading data from: {os.path.basename(first_csv_file)}")
 
     # Load the CSV data and create the DataFrame
-    df_diner = pd.read_csv(first_csv_file)
-    df_diner["diner_category_detail"].fillna("기타", inplace=True)
+    df_diner = pd.read_csv(first_csv_file, low_memory=False)
+    
+    # null 값 처리를 더 안전하게 수행
+    df_diner = df_diner.copy()  # 복사본 생성하여 경고 방지
+    df_diner["diner_category_detail"] = df_diner["diner_category_detail"].fillna("기타")
     # df_diner["diner_menu"] = df_diner["diner_menu"].apply(ast.literal_eval)
 
+    # null 값을 빈 리스트 문자열로 채우기
+    df_diner["diner_menu_name"] = df_diner["diner_menu_name"].fillna("[]")
     df_diner["diner_menu_name"] = df_diner["diner_menu_name"].apply(
         lambda x: safe_string_to_list(x, "diner_menu_name")
     )
 
+    # null 값을 빈 리스트 문자열로 채우기
+    df_diner["diner_tag"] = df_diner["diner_tag"].fillna("[]")
     df_diner["diner_tag"] = df_diner["diner_tag"].apply(
         lambda x: safe_string_to_list(x, "diner_tag")
     )
