@@ -526,7 +526,7 @@ def has_completed_onboarding() -> bool:
 
         # onboarding_completed 로그가 있는지 확인
         onboarding_logs = logger.get_user_logs(
-            uid, limit=5, collection_name="activity_logs"
+            uid, limit=5, collection_name="onboarding_logs"
         )
 
         for log in onboarding_logs:

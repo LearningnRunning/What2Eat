@@ -342,7 +342,9 @@ class OnboardingManager:
             try:
                 db = firestore.client()
                 # activity_logs와 같은 레벨의 하위 컬렉션으로 저장
-                db.collection("users").document(uid).collection("onboarding_logs").document("profile").set(save_data)
+                db.collection("users").document(uid).collection(
+                    "onboarding_logs"
+                ).document("profile").set(save_data)
                 st.success("✅ 프로필이 성공적으로 저장되었습니다!")
             except Exception as firestore_error:
                 st.warning(f"⚠️ Firestore 저장 실패: {str(firestore_error)}")
@@ -381,7 +383,13 @@ class OnboardingManager:
             # Firestore의 users/{uid}/onboarding_logs 하위 컬렉션에서 로드
             try:
                 db = firestore.client()
-                doc = db.collection("users").document(uid).collection("onboarding_logs").document("profile").get()
+                doc = (
+                    db.collection("users")
+                    .document(uid)
+                    .collection("onboarding_logs")
+                    .document("profile")
+                    .get()
+                )
                 if doc.exists:
                     return doc.to_dict()
                 else:
@@ -395,7 +403,9 @@ class OnboardingManager:
             return None
 
     def update_user_profile(
-        self, profile_updates: Dict[str, Any] = None, ratings_updates: Dict[str, int] = None
+        self,
+        profile_updates: Dict[str, Any] = None,
+        ratings_updates: Dict[str, int] = None,
     ) -> bool:
         """사용자 프로필 데이터를 부분적으로 업데이트"""
         try:
@@ -410,17 +420,22 @@ class OnboardingManager:
             # Firestore의 users/{uid}/onboarding_logs 하위 컬렉션에서 업데이트
             try:
                 db = firestore.client()
-                doc_ref = db.collection("users").document(uid).collection("onboarding_logs").document("profile")
-                
+                doc_ref = (
+                    db.collection("users")
+                    .document(uid)
+                    .collection("onboarding_logs")
+                    .document("profile")
+                )
+
                 # 업데이트할 데이터 구성
                 update_data = {
                     "updated_at": datetime.now().isoformat(),
                 }
-                
+
                 # 프로필 데이터 업데이트
                 if profile_updates:
                     update_data.update(profile_updates)
-                
+
                 # 평점 데이터 업데이트
                 if ratings_updates:
                     # 기존 평점 데이터와 병합
@@ -431,11 +446,11 @@ class OnboardingManager:
                         update_data["ratings"] = existing_ratings
                     else:
                         update_data["ratings"] = ratings_updates
-                
+
                 # 문서 업데이트 (merge=True로 기존 데이터 유지)
                 doc_ref.set(update_data, merge=True)
                 st.success("✅ 프로필이 성공적으로 업데이트되었습니다!")
-                
+
             except Exception as firestore_error:
                 st.warning(f"⚠️ Firestore 업데이트 실패: {str(firestore_error)}")
                 return False
@@ -446,8 +461,12 @@ class OnboardingManager:
                     uid,
                     "profile_updated",
                     {
-                        "updated_fields": list(profile_updates.keys()) if profile_updates else [],
-                        "updated_ratings_count": len(ratings_updates) if ratings_updates else 0,
+                        "updated_fields": list(profile_updates.keys())
+                        if profile_updates
+                        else [],
+                        "updated_ratings_count": len(ratings_updates)
+                        if ratings_updates
+                        else 0,
                     },
                 )
 
@@ -471,9 +490,11 @@ class OnboardingManager:
             # Firestore의 users/{uid}/onboarding_logs 하위 컬렉션에서 삭제
             try:
                 db = firestore.client()
-                db.collection("users").document(uid).collection("onboarding_logs").document("profile").delete()
+                db.collection("users").document(uid).collection(
+                    "onboarding_logs"
+                ).document("profile").delete()
                 st.success("✅ 프로필이 성공적으로 삭제되었습니다!")
-                
+
             except Exception as firestore_error:
                 st.warning(f"⚠️ Firestore 삭제 실패: {str(firestore_error)}")
                 return False
@@ -574,7 +595,9 @@ class OnboardingManager:
                     df_quality, preferred_categories, limit=2
                 )
                 for rec in pref_recs:
-                    rec["reason"] = f"선호하시는 {rec['category']} 카테고리의 인기 맛집이에요! (평점 {rec['diner_grade']:.1f})"
+                    rec["reason"] = (
+                        f"선호하시는 {rec['category']} 카테고리의 인기 맛집이에요! (평점 {rec['diner_grade']:.1f})"
+                    )
                     rec["recommendation_type"] = "선호 카테고리"
                 recommendations.extend(pref_recs)
 
@@ -584,35 +607,59 @@ class OnboardingManager:
                     df_quality, high_rated_categories, preferred_categories, limit=2
                 )
                 for rec in pattern_recs:
-                    rec["reason"] = f"평가하신 {rec['category']} 맛집들과 비슷한 스타일이에요! (평점 {rec['diner_grade']:.1f})"
+                    rec["reason"] = (
+                        f"평가하신 {rec['category']} 맛집들과 비슷한 스타일이에요! (평점 {rec['diner_grade']:.1f})"
+                    )
                     rec["recommendation_type"] = "취향 분석"
                 recommendations.extend(pattern_recs)
 
             # 3. 예산 고려 추천
             budget_recs = self._get_budget_friendly_recommendations(
-                df_quality, budget, preferred_categories + high_rated_categories, limit=1
+                df_quality,
+                budget,
+                preferred_categories + high_rated_categories,
+                limit=1,
             )
             for rec in budget_recs:
-                rec["reason"] = f"예산 {budget}에 맞는 가성비 좋은 맛집이에요! (평점 {rec['diner_grade']:.1f})"
+                rec["reason"] = (
+                    f"예산 {budget}에 맞는 가성비 좋은 맛집이에요! (평점 {rec['diner_grade']:.1f})"
+                )
                 rec["recommendation_type"] = "예산 맞춤"
             recommendations.extend(budget_recs)
 
             # 4. 매운맛 선호도 기반 추천
             spice_recs = self._get_spice_level_recommendations(
-                df_quality, spice_level, preferred_categories + high_rated_categories, limit=1
+                df_quality,
+                spice_level,
+                preferred_categories + high_rated_categories,
+                limit=1,
             )
             for rec in spice_recs:
-                spice_desc = "순한맛" if spice_level <= 2 else "보통맛" if spice_level <= 3 else "매운맛"
-                rec["reason"] = f"매운맛 {spice_level}단 기준으로 {spice_desc} 좋아하실 것 같아요! (평점 {rec['diner_grade']:.1f})"
+                spice_desc = (
+                    "순한맛"
+                    if spice_level <= 2
+                    else "보통맛"
+                    if spice_level <= 3
+                    else "매운맛"
+                )
+                rec["reason"] = (
+                    f"매운맛 {spice_level}단 기준으로 {spice_desc} 좋아하실 것 같아요! (평점 {rec['diner_grade']:.1f})"
+                )
                 rec["recommendation_type"] = "매운맛 맞춤"
             recommendations.extend(spice_recs)
 
             # 5. 연령/성별 기반 인기 맛집 추천
             demo_recs = self._get_demographic_recommendations(
-                df_quality, age_group, gender, preferred_categories + high_rated_categories, limit=1
+                df_quality,
+                age_group,
+                gender,
+                preferred_categories + high_rated_categories,
+                limit=1,
             )
             for rec in demo_recs:
-                rec["reason"] = f"{age_group} {gender}분들이 많이 찾는 인기 맛집이에요! (평점 {rec['diner_grade']:.1f})"
+                rec["reason"] = (
+                    f"{age_group} {gender}분들이 많이 찾는 인기 맛집이에요! (평점 {rec['diner_grade']:.1f})"
+                )
                 rec["recommendation_type"] = "인기 맛집"
             recommendations.extend(demo_recs)
 
@@ -620,7 +667,9 @@ class OnboardingManager:
             unique_recommendations = self._remove_duplicates(recommendations)
 
             # 최대 5개로 제한하고 다양성 확보
-            final_recommendations = self._ensure_diversity(unique_recommendations, max_count=5)
+            final_recommendations = self._ensure_diversity(
+                unique_recommendations, max_count=5
+            )
 
             return final_recommendations
 
@@ -632,10 +681,10 @@ class OnboardingManager:
         """출생연도를 기반으로 연령대 반환"""
         if not birth_year:
             return "전체"
-        
+
         current_year = datetime.now().year
         age = current_year - birth_year
-        
+
         if age < 20:
             return "10대"
         elif age < 30:
@@ -655,7 +704,7 @@ class OnboardingManager:
             return []
 
         high_rated_categories = []
-        
+
         # 4점 이상 평가한 음식점들의 카테고리 추출
         for restaurant_id, rating in ratings_data.items():
             if rating >= 4:
@@ -677,40 +726,53 @@ class OnboardingManager:
     ) -> List[Dict[str, Any]]:
         """선호 카테고리 기반 추천"""
         category_recs = []
-        
+
         for category in preferred_categories[:2]:  # 상위 2개 카테고리만
             category_df = df_quality[df_quality["diner_category_large"] == category]
             if len(category_df) > 0:
                 # diner_grade 높은 순으로 정렬하여 상위 1개 선택
                 top_restaurant = category_df.nlargest(1, "diner_grade")
-                category_recs.extend(self._convert_to_recommendation_format(top_restaurant))
-                
+                category_recs.extend(
+                    self._convert_to_recommendation_format(top_restaurant)
+                )
+
         return category_recs[:limit]
 
     def _get_pattern_based_recommendations(
-        self, df_quality: pd.DataFrame, high_rated_categories: List[str], 
-        preferred_categories: List[str], limit: int = 2
+        self,
+        df_quality: pd.DataFrame,
+        high_rated_categories: List[str],
+        preferred_categories: List[str],
+        limit: int = 2,
     ) -> List[Dict[str, Any]]:
         """평가 패턴 기반 추천"""
         pattern_recs = []
-        
+
         # 이미 선호 카테고리에서 추천된 것과 다른 카테고리 선택
-        available_categories = [cat for cat in high_rated_categories if cat not in preferred_categories]
-        
+        available_categories = [
+            cat for cat in high_rated_categories if cat not in preferred_categories
+        ]
+
         for category in available_categories[:2]:
             category_df = df_quality[df_quality["diner_category_large"] == category]
             if len(category_df) > 0:
                 top_restaurant = category_df.nlargest(1, "diner_grade")
-                pattern_recs.extend(self._convert_to_recommendation_format(top_restaurant))
-                
+                pattern_recs.extend(
+                    self._convert_to_recommendation_format(top_restaurant)
+                )
+
         return pattern_recs[:limit]
 
     def _get_budget_friendly_recommendations(
-        self, df_quality: pd.DataFrame, budget: str, exclude_categories: List[str], limit: int = 1
+        self,
+        df_quality: pd.DataFrame,
+        budget: str,
+        exclude_categories: List[str],
+        limit: int = 1,
     ) -> List[Dict[str, Any]]:
         """예산 친화적 추천 (분식, 한식 등 가성비 좋은 카테고리 우선)"""
         budget_friendly_categories = ["분식", "한식", "치킨", "중식", "패스트푸드"]
-        
+
         # 예산에 따른 카테고리 우선순위 조정
         if "1만원" in budget or "만원 이하" in budget:
             priority_categories = ["분식", "패스트푸드", "치킨"]
@@ -718,18 +780,24 @@ class OnboardingManager:
             priority_categories = ["한식", "분식", "중식"]
         else:
             priority_categories = ["한식", "양식", "일식"]
-            
+
         for category in priority_categories:
             if category not in exclude_categories:
                 category_df = df_quality[df_quality["diner_category_large"] == category]
                 if len(category_df) > 0:
                     top_restaurant = category_df.nlargest(1, "diner_grade")
-                    return self._convert_to_recommendation_format(top_restaurant)[:limit]
-                    
+                    return self._convert_to_recommendation_format(top_restaurant)[
+                        :limit
+                    ]
+
         return []
 
     def _get_spice_level_recommendations(
-        self, df_quality: pd.DataFrame, spice_level: int, exclude_categories: List[str], limit: int = 1
+        self,
+        df_quality: pd.DataFrame,
+        spice_level: int,
+        exclude_categories: List[str],
+        limit: int = 1,
     ) -> List[Dict[str, Any]]:
         """매운맛 선호도 기반 추천"""
         if spice_level <= 2:  # 순한맛 선호
@@ -738,43 +806,65 @@ class OnboardingManager:
             mild_categories = ["한식", "중식", "분식"]
         else:  # 매운맛 선호
             mild_categories = ["중식", "한식", "동남아시아음식", "인도음식"]
-            
+
         for category in mild_categories:
             if category not in exclude_categories:
                 category_df = df_quality[df_quality["diner_category_large"] == category]
                 if len(category_df) > 0:
                     top_restaurant = category_df.nlargest(1, "diner_grade")
-                    return self._convert_to_recommendation_format(top_restaurant)[:limit]
-                    
+                    return self._convert_to_recommendation_format(top_restaurant)[
+                        :limit
+                    ]
+
         return []
 
     def _get_demographic_recommendations(
-        self, df_quality: pd.DataFrame, age_group: str, gender: str, 
-        exclude_categories: List[str], limit: int = 1
+        self,
+        df_quality: pd.DataFrame,
+        age_group: str,
+        gender: str,
+        exclude_categories: List[str],
+        limit: int = 1,
     ) -> List[Dict[str, Any]]:
         """연령/성별 기반 인기 맛집 추천"""
         # 전체적으로 인기 높은 카테고리에서 추천
         popular_categories = ["한식", "양식", "일식", "중식", "카페"]
-        
+
         for category in popular_categories:
             if category not in exclude_categories:
                 category_df = df_quality[df_quality["diner_category_large"] == category]
                 if len(category_df) > 0:
                     # 리뷰 수와 평점을 모두 고려한 종합 점수로 정렬
                     category_df = category_df.copy()
+
+                    # diner_review_cnt를 숫자형으로 변환하고 NaN을 0으로 처리
+                    review_counts = pd.to_numeric(
+                        category_df["diner_review_cnt"], errors="coerce"
+                    ).fillna(0)
+                    max_review_count = review_counts.max()
+
+                    # 0으로 나누기 방지: max_review_count가 0이면 정규화 점수는 0으로 설정
+                    if max_review_count > 0:
+                        normalized_review_score = review_counts / max_review_count
+                    else:
+                        normalized_review_score = 0
+
                     category_df["composite_score"] = (
-                        category_df["diner_grade"] * 0.7 + 
-                        (category_df["diner_review_cnt"].fillna(0) / category_df["diner_review_cnt"].fillna(0).max()) * 0.3
+                        category_df["diner_grade"] * 0.7 + normalized_review_score * 0.3
                     )
                     top_restaurant = category_df.nlargest(1, "composite_score")
-                    return self._convert_to_recommendation_format(top_restaurant)[:limit]
-                    
+                    return self._convert_to_recommendation_format(top_restaurant)[
+                        :limit
+                    ]
+
         return []
 
-    def _convert_to_recommendation_format(self, df_restaurants: pd.DataFrame) -> List[Dict[str, Any]]:
+    def _convert_to_recommendation_format(
+        self, df_restaurants: pd.DataFrame
+    ) -> List[Dict[str, Any]]:
         """DataFrame을 추천 형식으로 변환"""
         recommendations = []
-        
+
         for _, row in df_restaurants.iterrows():
             # NaN 값 안전하게 처리
             review_count = row.get("diner_review_cnt", 0)
@@ -804,30 +894,36 @@ class OnboardingManager:
                 "rating": diner_grade,  # 호환성을 위해 중복
                 "review_count": review_count,
                 "distance": distance,
-                "specialties": row.get("diner_menu_name", [])[:3] if row.get("diner_menu_name") else [],
+                "specialties": row.get("diner_menu_name", [])[:3]
+                if row.get("diner_menu_name")
+                else [],
                 "price_range": "정보 없음",
             }
             recommendations.append(recommendation)
-            
+
         return recommendations
 
-    def _remove_duplicates(self, recommendations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _remove_duplicates(
+        self, recommendations: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """중복 음식점 제거"""
         seen_ids = set()
         unique_recs = []
-        
+
         for rec in recommendations:
             if rec["id"] not in seen_ids:
                 seen_ids.add(rec["id"])
                 unique_recs.append(rec)
-                
+
         return unique_recs
 
-    def _ensure_diversity(self, recommendations: List[Dict[str, Any]], max_count: int = 5) -> List[Dict[str, Any]]:
+    def _ensure_diversity(
+        self, recommendations: List[Dict[str, Any]], max_count: int = 5
+    ) -> List[Dict[str, Any]]:
         """추천 목록의 다양성 확보"""
         if len(recommendations) <= max_count:
             return recommendations
-            
+
         # 카테고리별로 분류
         category_groups = {}
         for rec in recommendations:
@@ -835,14 +931,14 @@ class OnboardingManager:
             if category not in category_groups:
                 category_groups[category] = []
             category_groups[category].append(rec)
-            
+
         # 각 카테고리에서 최대 2개씩 선택하여 다양성 확보
         diverse_recs = []
         for category, recs in category_groups.items():
             # diner_grade 높은 순으로 정렬하여 상위 2개 선택
             sorted_recs = sorted(recs, key=lambda x: x["diner_grade"], reverse=True)
             diverse_recs.extend(sorted_recs[:2])
-            
+
         # 전체 평점 순으로 정렬하여 최종 max_count개 선택
         final_recs = sorted(diverse_recs, key=lambda x: x["diner_grade"], reverse=True)
         return final_recs[:max_count]

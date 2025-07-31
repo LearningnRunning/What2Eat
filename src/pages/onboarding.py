@@ -491,7 +491,7 @@ class OnboardingPage:
         if preferred_categories:
             st.markdown(f"""
             설정하신 지역 **'{st.session_state.user_profile.get("location", "")}'** 주변의 음식점들입니다.  
-            선호하신 **{', '.join(preferred_categories)}** 카테고리를 우선으로 보여드려요. 📍  
+            선호하신 **{", ".join(preferred_categories)}** 카테고리를 우선으로 보여드려요. 📍  
             경험해보신 곳이 있다면 1-5점으로 평가해주세요. (최소 {self.min_ratings_required}개 평가 필요)
             """)
         else:
@@ -552,7 +552,9 @@ class OnboardingPage:
                     )
 
                 with col2:
-                    st.markdown(f"[{restaurant['name']}](https://place.map.kakao.com/{restaurant['id']})")
+                    st.markdown(
+                        f"[{restaurant['name']}](https://place.map.kakao.com/{restaurant['id']})"
+                    )
                     if is_preferred:
                         st.markdown("💖 **선호 카테고리**")
                     st.markdown(f"📍 {restaurant['address']}")
@@ -571,9 +573,7 @@ class OnboardingPage:
                     rating = st.select_slider(
                         f"{restaurant['name']} 평가",
                         options=[0, 1, 2, 3, 4, 5],
-                        format_func=lambda x: "평가 안함"
-                        if x == 0
-                        else f"{x}점",
+                        format_func=lambda x: "평가 안함" if x == 0 else f"{x}점",
                         value=st.session_state.restaurant_ratings.get(rating_key, 0),
                         key=unique_rating_key,
                     )
@@ -763,23 +763,23 @@ class OnboardingPage:
                 # 온보딩 완료 로그 기록
                 self._log_onboarding_completion()
 
-                # 추천 미리보기 표시
-                st.markdown("### 🎯 당신을 위한 추천 미리보기")
-                preview_recommendations = (
-                    self.onboarding_manager.get_recommendation_preview(
-                        st.session_state.user_profile,
-                        st.session_state.restaurant_ratings,
-                    )
-                )
+                # # 추천 미리보기 표시
+                # st.markdown("### 🎯 당신을 위한 추천 미리보기")
+                # preview_recommendations = (
+                #     self.onboarding_manager.get_recommendation_preview(
+                #         st.session_state.user_profile,
+                #         st.session_state.restaurant_ratings,
+                #     )
+                # )
 
-                for rec in preview_recommendations:
-                    st.info(
-                        f"🍽️ **{rec['name']}** ({rec['category']}) - {rec['reason']}"
-                    )
+                # for rec in preview_recommendations:
+                #     st.info(
+                #         f"🍽️ **{rec['name']}** ({rec['category']}) - {rec['reason']}"
+                #     )
 
                 # 메인 앱으로 이동 (5초 후 자동 이동)
                 st.balloons()
-                st.success("5초 후 메인 페이지로 이동합니다...")
+                # st.success("5초 후 메인 페이지로 이동합니다...")
 
                 # JavaScript로 페이지 리디렉트 (임시 방법)
                 st.markdown(
@@ -797,7 +797,9 @@ class OnboardingPage:
                     # 온보딩 완료 플래그 설정 (세션 클리어 전에 설정)
                     onboarding_completed = True
                     st.session_state.clear()  # 온보딩 상태 초기화
-                    st.session_state.onboarding_just_completed = onboarding_completed  # 플래그 복원
+                    st.session_state.onboarding_just_completed = (
+                        onboarding_completed  # 플래그 복원
+                    )
                     st.rerun()
             else:
                 st.error("❌ 저장 중 오류가 발생했습니다. 다시 시도해주세요.")
