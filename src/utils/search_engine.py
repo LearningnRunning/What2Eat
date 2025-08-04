@@ -3,7 +3,6 @@
 """
 
 import logging
-
 import pandas as pd
 
 # 로거 설정
@@ -72,34 +71,48 @@ class DinerSearchEngine:
             results = pd.DataFrame(partial_matches).assign(match_type="부분 매칭")
             return self._add_kakao_map_links(results)
 
-        # 3. 자모 기반 직접 매칭
-        jamo_scores = []
+        # 3. 자모 기반 매칭
+        jamo_candidates = []
+        exact_jamo_match = None
+        
         for d in self.diner_infos:
             is_jamo, score = self._jamo_similarity(
                 norm_query, self._normalize(d["name"]), threshold=jamo_threshold
             )
+            
             if is_jamo:
-                results = pd.DataFrame(
-                    [
-                        {
-                            "name": d["name"],
-                            "idx": d["idx"],
-                            "jamo_score": score,
-                            "match_type": "자모 매칭",
-                        }
-                    ]
-                )
-                return self._add_kakao_map_links(results)
-            else:
-                if score > jamo_candidate_threshold:
-                    jamo_scores.append((d, score))
+                # 정확한 자모 매칭 발견
+                exact_jamo_match = {
+                    "name": d["name"],
+                    "idx": d["idx"],
+                    "jamo_score": score,
+                    "match_type": "자모 매칭"
+                }
+                break
+            elif score > jamo_candidate_threshold:
+                # 후보 자모 매칭 추가 (top_k개만 유지)
+                jamo_candidates.append({
+                    "name": d["name"],
+                    "idx": d["idx"],
+                    "jamo_score": score,
+                    "match_type": "자모 매칭"
+                })
+                # 점수 순으로 정렬하고 top_k개만 유지
+                jamo_candidates.sort(key=lambda x: x["jamo_score"], reverse=True)
+                if len(jamo_candidates) > top_k:
+                    jamo_candidates = jamo_candidates[:top_k]
 
-        jamo_top = sorted(jamo_scores, key=lambda x: x[1], reverse=True)[:top_k]
-
-        if jamo_top:
-            results = pd.DataFrame(jamo_top).assign(match_type="자모 매칭")
+        # 정확한 자모 매칭이 있으면 즉시 반환
+        if exact_jamo_match:
+            results = pd.DataFrame([exact_jamo_match])
             return self._add_kakao_map_links(results)
-
+        
+        # 후보 자모 매칭이 있으면 반환
+        if jamo_candidates:
+            results = pd.DataFrame(jamo_candidates)
+            return self._add_kakao_map_links(results)
+        
+        # 검색 결과 없음
         return pd.DataFrame().assign(match_type="검색 결과 없음")
 
     def _normalize(self, text: str) -> str:
@@ -123,15 +136,15 @@ class DinerSearchEngine:
         Args:
             a: 첫 번째 문자열
             b: 두 번째 문자열
-            threshold: 자모 유사도 임계값
+            threshold: 자모 유사도 임계값 (0.0 ~ 1.0)
 
         Returns:
             (자모 매칭 여부, 유사도 점수)
         """
         a_jamo = " ".join(hangul_to_jamo(a))
         b_jamo = " ".join(hangul_to_jamo(b))
-        score = fuzz.ratio(a_jamo, b_jamo)
-
+        score = fuzz.ratio(a_jamo, b_jamo) / 100.0  # 0-100을 0-1로 변환
+        
         if score > threshold:
             return True, score
         else:
@@ -146,7 +159,7 @@ class DinerSearchEngine:
         # 카카오맵 링크 컬럼 추가
         df = df.copy()
         # name 컬럼을 카카오맵 링크로 변환
-        df["name"] = df.apply(
+        df["name_link"] = df.apply(
             lambda row: f"[{row['name']}](https://place.map.kakao.com/{row['idx']})",
             axis=1,
         )
