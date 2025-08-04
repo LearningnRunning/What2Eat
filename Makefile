@@ -1,15 +1,16 @@
-.PHONY: install dev run test lint format clean help
+.PHONY: install dev run test lint format clean help separate-data
 
 # 기본 타겟
 help:
 	@echo "사용 가능한 명령어:"
-	@echo "  install    - 의존성 설치"
-	@echo "  dev        - 개발 의존성 포함하여 설치"
-	@echo "  run        - Streamlit 애플리케이션 실행"
-	@echo "  test       - 테스트 실행"
-	@echo "  lint       - 코드 린팅"
-	@echo "  format     - 코드 포맷팅"
-	@echo "  clean      - 캐시 및 임시 파일 정리"
+	@echo "  install       - 의존성 설치"
+	@echo "  dev           - 개발 의존성 포함하여 설치"
+	@echo "  run           - Streamlit 애플리케이션 실행"
+	@echo "  test          - 테스트 실행"
+	@echo "  lint          - 코드 린팅"
+	@echo "  format        - 코드 포맷팅"
+	@echo "  clean         - 캐시 및 임시 파일 정리"
+	@echo "  separate-data - CSV 파일을 분리된 파일들로 변환"
 
 # 의존성 설치
 install:
@@ -36,6 +37,11 @@ lint:
 format:
 	uv run black src/
 	uv run isort src/
+
+# CSV 파일 분리
+separate-data:
+	@echo "🚀 CSV 파일 분리 작업을 시작합니다..."
+	cd src && uv run python -m utils.data_separator
 
 # 정리
 clean:
