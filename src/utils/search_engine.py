@@ -22,17 +22,24 @@ class DinerSearchEngine:
 
     def load_basic_data(self, df_basic):
         """
-        기본 정보만 로드하여 검색 엔진을 초기화합니다.
+        기본 정보와 거리 정보를 로드하여 검색 엔진을 초기화합니다.
 
         Args:
-            df_basic: diner_idx, diner_name이 포함된 기본 정보 DataFrame
+            df_basic: diner_idx, diner_name, distance가 포함된 DataFrame
         """
         self.diner_infos = []
 
         for _, row in df_basic.iterrows():
-            self.diner_infos.append(
-                {"idx": str(row["diner_idx"]), "name": row["diner_name"]}
-            )
+            diner_info = {
+                "idx": str(row["diner_idx"]), 
+                "name": row["diner_name"]
+            }
+            
+            # 거리 정보가 있으면 추가
+            if "distance" in row and pd.notna(row["distance"]):
+                diner_info["distance"] = float(row["distance"])
+            
+            self.diner_infos.append(diner_info)
 
         logger.info(f"검색 엔진 초기화 완료: {len(self.diner_infos)}개 음식점")
 
@@ -60,7 +67,13 @@ class DinerSearchEngine:
             d for d in self.diner_infos if self._normalize(d["name"]) == norm_query
         ]
         if exact_matches:
-            results = pd.DataFrame(exact_matches).assign(match_type="정확한 매칭")
+            results = pd.DataFrame(exact_matches).assign(
+                match_type="정확한 매칭",
+                jamo_score=1.0  # 정확한 매칭은 최고 점수
+            )
+            # 거리 정보가 있으면 거리 순으로 정렬
+            if "distance" in results.columns:
+                results = results.sort_values(by="distance", ascending=True)
             return self._add_kakao_map_links(results)
 
         # 2. 부분 매칭
@@ -68,7 +81,13 @@ class DinerSearchEngine:
             d for d in self.diner_infos if norm_query in self._normalize(d["name"])
         ]
         if partial_matches:
-            results = pd.DataFrame(partial_matches).assign(match_type="부분 매칭")
+            results = pd.DataFrame(partial_matches).assign(
+                match_type="부분 매칭",
+                jamo_score=0.8  # 부분 매칭은 높은 점수
+            )
+            # 거리 정보가 있으면 거리 순으로 정렬
+            if "distance" in results.columns:
+                results = results.sort_values(by="distance", ascending=True)
             return self._add_kakao_map_links(results)
 
         # 3. 자모 기반 매칭
@@ -113,7 +132,10 @@ class DinerSearchEngine:
             return self._add_kakao_map_links(results)
         
         # 검색 결과 없음
-        return pd.DataFrame().assign(match_type="검색 결과 없음")
+        return pd.DataFrame().assign(
+            match_type="검색 결과 없음",
+            jamo_score=0.0
+        )
 
     def _normalize(self, text: str) -> str:
         """

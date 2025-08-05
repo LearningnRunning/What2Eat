@@ -39,12 +39,17 @@ class OnboardingPage:
             try:
                 import pandas as pd
 
-                # 기본 데이터 로드 (diner_idx, diner_name만)
+                # 기본 데이터 로드 (diner_idx, diner_name, distance 포함)
                 data_file = "data/seoul_data/whatToEat_DB_seoul_diner_20250301_plus_review_cnt.csv"
                 df = pd.read_csv(data_file)
 
                 if "diner_idx" in df.columns and "diner_name" in df.columns:
-                    basic_df = df[["diner_idx", "diner_name"]].dropna()
+                    # 거리 정보가 있으면 포함, 없으면 기본 정보만
+                    if "distance" in df.columns:
+                        basic_df = df[["diner_idx", "diner_name", "distance"]].dropna(subset=["diner_idx", "diner_name"])
+                    else:
+                        basic_df = df[["diner_idx", "diner_name"]].dropna()
+                    
                     search_engine = DinerSearchEngine()
                     search_engine.load_basic_data(basic_df)
                     st.session_state.search_engine = search_engine
@@ -60,7 +65,7 @@ class OnboardingPage:
     @st.dialog("🔍 음식점 검색")
     def search_restaurant_dialog(self):
         """음식점 검색 다이얼로그"""
-        st.subheader("음식점 검색")
+        st.subheader("🔍 음식점 검색")
 
         # 검색 엔진 초기화
         if not self._initialize_search_engine():
@@ -69,8 +74,8 @@ class OnboardingPage:
 
         # 검색 입력
         query = st.text_input(
-            "음식점 이름을 입력하세요",
-            placeholder="예: 맛있는집, 스시로, 피자헛...",
+            "🔍 음식점 이름을 입력하세요",
+            placeholder="예: 맛있는집, 스시로, 피자헛, 강남 맛집...",
             help="정확한 매칭, 부분 매칭, 자모 매칭을 지원합니다.",
             key="onboarding_search_input",
         )
@@ -83,6 +88,16 @@ class OnboardingPage:
                 jamo_threshold=0.9,
                 jamo_candidate_threshold=0.7,
             )
+            
+            # 매칭 타입에 따라 다른 정렬 기준 적용
+            if not results.empty:
+                if "jamo_score" in results.columns:
+                    # 자모 매칭의 경우 점수 순으로 정렬
+                    if "자모 매칭" in results["match_type"].values:
+                        results.sort_values(by="jamo_score", ascending=False, inplace=True)
+                    # 정확한 매칭이나 부분 매칭의 경우 거리 순으로 정렬 (거리 정보가 있는 경우)
+                    elif "distance" in results.columns:
+                        results.sort_values(by="distance", ascending=True, inplace=True)
 
             if results.empty:
                 st.warning("검색 결과가 없습니다.")
@@ -91,30 +106,40 @@ class OnboardingPage:
 
                 # 검색 결과 표시 및 평가
                 for i, (_, row) in enumerate(results.iterrows(), 1):
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.write(f"**{i}. {row['name']}** ({row['match_type']})")
-                    with col2:
+                    with st.expander(f"🍽️ {i}. {row['name']} ({row['match_type']})"):
+                        st.markdown(f"**📍 [카카오맵에서 보기](https://place.map.kakao.com/{row['idx']})**")
+                        st.markdown(f"**매칭 타입:** {row['match_type']}")
+                        
+                        # 거리 정보 표시 (있는 경우)
+                        if "distance" in row and pd.notna(row["distance"]):
+                            st.markdown(f"**🚶‍♂️ 거리:** {row['distance']:.1f}km")
+                        
+                        # 평가 섹션
+                        st.markdown("---")
+                        st.markdown("**⭐ 평가하기**")
                         # 평가 키 생성
                         rating_key = f"rating_search_{row['idx']}"
+                        current_rating = st.session_state.restaurant_ratings.get(
+                            rating_key, 0
+                        )
 
-                        # st.feedback 사용
+                        # 이미 평가한 경우 수정 가능하도록 안내
+                        if current_rating > 0:
+                            st.success(f"✅ 이미 {current_rating}점을 주셨습니다! (별점을 다시 클릭하면 수정할 수 있어요)")
+
+                        # st.feedback 사용 (수정 가능)
                         feedback = st.feedback(
                             options="stars",
                             key=f"feedback_search_{row['idx']}_{i}",
                         )
 
-                        # 현재 평가 상태 표시
-                        current_rating = st.session_state.restaurant_ratings.get(
-                            rating_key, 0
-                        )
-                        if current_rating > 0:
-                            st.success(f"✅ 이미 {current_rating}점을 주셨습니다!")
-                        elif feedback is not None:
-                            st.success(f"✅ {feedback}점을 주셨습니다!")
-
-                        # 피드백 결과 처리
+                        # 새로 평가하거나 수정한 경우 처리
                         if feedback is not None:
+                            if current_rating == 0:
+                                st.success(f"✅ {feedback}점을 주셨습니다!")
+                            else:
+                                st.success(f"✅ 평가를 {feedback}점으로 수정하셨습니다!")
+                            
                             st.session_state.restaurant_ratings[rating_key] = feedback
 
     def _handle_current_location(self):
@@ -591,11 +616,19 @@ class OnboardingPage:
 
         # 검색 기능 추가
         st.markdown("### 🔍 원하는 음식점을 검색해서 평가하기")
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.info("평가하고 싶은 음식점이 목록에 없다면 검색해서 찾아보세요!")
+        
+        # 검색 안내 메시지
+        st.info("""
+        💡 **검색 팁!**
+        - 현재 목록은 설정한 위치 주변의 음식점들만 보여드려요
+        - 검색을 통해 **원하는 음식점**을 찾아서 평가할 수 있어요 🎯
+        """)
+        
+        # 검색 버튼을 더 눈에 띄게 배치
+        st.markdown("---")
+        col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            if st.button("🔍 음식점 검색", type="secondary", use_container_width=True):
+            if st.button("🔍 음식점 검색하기", type="primary", use_container_width=True):
                 self.search_restaurant_dialog()
 
         st.markdown("---")
@@ -639,19 +672,7 @@ class OnboardingPage:
             )
 
             with st.expander(f"🍽️ {restaurant['name']} - {category_badge}"):
-                col1, col2 = st.columns([1, 2])
-
-                with col1:
-                    # 실제 이미지 URL 사용
-                    st.image(
-                        restaurant.get(
-                            "image_url",
-                            "https://via.placeholder.com/200x150/FF6B6B/FFFFFF?text=Restaurant",
-                        ),
-                        width=200,
-                    )
-
-                with col2:
+                # 이미지 제거하고 정보만 표시
                     st.markdown(
                         f"[{restaurant['name']}](https://place.map.kakao.com/{restaurant['id']})"
                     )
@@ -667,24 +688,30 @@ class OnboardingPage:
 
                     # 평가 (st.feedback 사용)
                     rating_key = f"rating_{restaurant['id']}"
-
-                    # st.feedback 사용
-                    feedback = st.feedback(
-                        options="stars",
-                        key=f"feedback_{restaurant['id']}_{i}",
-                    )
-
-                    # 현재 평가 상태 표시 (실시간 업데이트)
                     current_rating = st.session_state.restaurant_ratings.get(
                         rating_key, 0
                     )
+
+                    # 이미 평가한 경우 수정 가능하도록 안내
                     if current_rating > 0:
-                        st.success(f"✅ 이미 {current_rating}점을 주셨습니다!")
+                        st.success(f"✅ {current_rating}점을 주셨습니다!")
                         rated_count += 1
-                    elif feedback is not None:
-                        # 새로 평가한 경우 즉시 표시
-                        st.success(f"✅ {feedback}점을 주셨습니다!")
-                        rated_count += 1
+                    
+                    # st.feedback 사용 (수정 가능)
+                    feedback = st.feedback(
+                        options="stars",
+                        key=f"feedback_{restaurant['id']}_{i}",
+                    ) + 1
+
+                    # 새로 평가하거나 수정한 경우 처리
+                    if feedback is not None:
+                        if current_rating == 0:
+                            st.success(f"✅ {feedback}점을 주셨습니다!")
+                            rated_count += 1
+                        else:
+                            st.success(f"✅ 평가를 {feedback}점으로 수정하셨습니다!")
+                        
+                        st.session_state.restaurant_ratings[rating_key] = feedback
 
                     # 피드백 결과 처리
                     if feedback is not None:
