@@ -114,7 +114,7 @@ class OnboardingManager:
 
         # 2km 반경 내 데이터 필터링
         df_geo_filtered = get_filtered_data(
-            self.app.df_diner, user_lat, user_lon, max_radius=2
+            self.app.df_diner, user_lat, user_lon, max_radius=3
         )
 
         # diner_grade가 있는 데이터만 필터링
@@ -249,7 +249,7 @@ class OnboardingManager:
 
         # 2km 반경 내 데이터 필터링
         df_geo_filtered = get_filtered_data(
-            self.app.df_diner, user_lat, user_lon, max_radius=2
+            self.app.df_diner, user_lat, user_lon, max_radius=10
         )
 
         # 같은 카테고리의 음식점만 필터링
