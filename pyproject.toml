@@ -44,6 +44,9 @@ dependencies = [
     "pyjwt[crypto]>=2.5.0",
     "python-dotenv>=1.0.0",
     "beautifulsoup4>=4.12.0",
+    "fuzzywuzzy>=0.18.0",
+    "jamo>=0.4.1",
+    "python-levenshtein>=0.27.1",
 ]
 
 [tool.hatch.build.targets.wheel]

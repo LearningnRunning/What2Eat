@@ -6,6 +6,7 @@ from utils.auth import get_current_user
 from utils.category_manager import get_category_manager
 from utils.firebase_logger import get_firebase_logger
 from utils.onboarding import get_onboarding_manager
+from utils.search_engine import DinerSearchEngine
 
 
 class OnboardingPage:
@@ -27,6 +28,119 @@ class OnboardingPage:
 
         if "restaurant_ratings" not in st.session_state:
             st.session_state.restaurant_ratings = {}
+
+        # 검색 엔진 초기화
+        if "search_engine" not in st.session_state:
+            st.session_state.search_engine = None
+
+    def _initialize_search_engine(self):
+        """검색 엔진을 초기화합니다."""
+        if st.session_state.search_engine is None:
+            try:
+                import pandas as pd
+
+                # 기본 데이터 로드 (diner_idx, diner_name, distance 포함)
+                data_file = "data/seoul_data/whatToEat_DB_seoul_diner_20250301_plus_review_cnt.csv"
+                df = pd.read_csv(data_file)
+
+                if "diner_idx" in df.columns and "diner_name" in df.columns:
+                    # 거리 정보가 있으면 포함, 없으면 기본 정보만
+                    if "distance" in df.columns:
+                        basic_df = df[["diner_idx", "diner_name", "distance"]].dropna(subset=["diner_idx", "diner_name"])
+                    else:
+                        basic_df = df[["diner_idx", "diner_name"]].dropna()
+                    
+                    search_engine = DinerSearchEngine()
+                    search_engine.load_basic_data(basic_df)
+                    st.session_state.search_engine = search_engine
+                    return True
+                else:
+                    st.error("❌ 데이터 파일에 필요한 컬럼이 없습니다.")
+                    return False
+            except Exception as e:
+                st.error(f"❌ 검색 엔진 초기화 실패: {str(e)}")
+                return False
+        return True
+
+    @st.dialog("🔍 음식점 검색")
+    def search_restaurant_dialog(self):
+        """음식점 검색 다이얼로그"""
+        st.subheader("🔍 음식점 검색")
+
+        # 검색 엔진 초기화
+        if not self._initialize_search_engine():
+            st.error("검색 엔진을 초기화할 수 없습니다.")
+            return
+
+        # 검색 입력
+        query = st.text_input(
+            "🔍 음식점 이름을 입력하세요",
+            placeholder="예: 맛있는집, 스시로, 피자헛, 강남 맛집...",
+            help="정확한 매칭, 부분 매칭, 자모 매칭을 지원합니다.",
+            key="onboarding_search_input",
+        )
+
+        # 검색 결과 표시
+        if query and len(query) >= 2:
+            results = st.session_state.search_engine.search(
+                query=query,
+                top_k=10,
+                jamo_threshold=0.9,
+                jamo_candidate_threshold=0.7,
+            )
+            
+            # 매칭 타입에 따라 다른 정렬 기준 적용
+            if not results.empty:
+                if "jamo_score" in results.columns:
+                    # 자모 매칭의 경우 점수 순으로 정렬
+                    if "자모 매칭" in results["match_type"].values:
+                        results.sort_values(by="jamo_score", ascending=False, inplace=True)
+                    # 정확한 매칭이나 부분 매칭의 경우 거리 순으로 정렬 (거리 정보가 있는 경우)
+                    elif "distance" in results.columns:
+                        results.sort_values(by="distance", ascending=True, inplace=True)
+
+            if results.empty:
+                st.warning("검색 결과가 없습니다.")
+            else:
+                st.success(f"✅ 검색 완료! {len(results)}개 결과를 찾았습니다.")
+
+                # 검색 결과 표시 및 평가
+                for i, (_, row) in enumerate(results.iterrows(), 1):
+                    with st.expander(f"🍽️ {i}. {row['name']} ({row['match_type']})"):
+                        st.markdown(f"**📍 [카카오맵에서 보기](https://place.map.kakao.com/{row['idx']})**")
+                        st.markdown(f"**매칭 타입:** {row['match_type']}")
+                        
+                        # 거리 정보 표시 (있는 경우)
+                        if "distance" in row and pd.notna(row["distance"]):
+                            st.markdown(f"**🚶‍♂️ 거리:** {row['distance']:.1f}km")
+                        
+                        # 평가 섹션
+                        st.markdown("---")
+                        st.markdown("**⭐ 평가하기**")
+                        # 평가 키 생성
+                        rating_key = f"rating_search_{row['idx']}"
+                        current_rating = st.session_state.restaurant_ratings.get(
+                            rating_key, 0
+                        )
+
+                        # 이미 평가한 경우 수정 가능하도록 안내
+                        if current_rating > 0:
+                            st.success(f"✅ 이미 {current_rating}점을 주셨습니다! (별점을 다시 클릭하면 수정할 수 있어요)")
+
+                        # st.feedback 사용 (수정 가능)
+                        feedback = st.feedback(
+                            options="stars",
+                            key=f"feedback_search_{row['idx']}_{i}",
+                        )
+
+                        # 새로 평가하거나 수정한 경우 처리
+                        if feedback is not None:
+                            if current_rating == 0:
+                                st.success(f"✅ {feedback}점을 주셨습니다!")
+                            else:
+                                st.success(f"✅ 평가를 {feedback}점으로 수정하셨습니다!")
+                            
+                            st.session_state.restaurant_ratings[rating_key] = feedback
 
     def _handle_current_location(self):
         """현재 위치 찾기 helper 함수"""
@@ -500,6 +614,25 @@ class OnboardingPage:
             경험해보신 곳이 있다면 1-5점으로 평가해주세요. (최소 {self.min_ratings_required}개 평가 필요)
             """)
 
+        # 검색 기능 추가
+        st.markdown("### 🔍 원하는 음식점을 검색해서 평가하기")
+        
+        # 검색 안내 메시지
+        st.info("""
+        💡 **검색 팁!**
+        - 현재 목록은 설정한 위치 주변의 음식점들만 보여드려요
+        - 검색을 통해 **원하는 음식점**을 찾아서 평가할 수 있어요 🎯
+        """)
+        
+        # 검색 버튼을 더 눈에 띄게 배치
+        st.markdown("---")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🔍 음식점 검색하기", type="primary", use_container_width=True):
+                self.search_restaurant_dialog()
+
+        st.markdown("---")
+
         # 페이징 상태 초기화
         if "restaurants_offset" not in st.session_state:
             st.session_state.restaurants_offset = 0
@@ -533,60 +666,65 @@ class OnboardingPage:
             # 선호 카테고리인지 표시
             is_preferred = restaurant.get("is_preferred", False)
             category_badge = (
-                f"💖 {restaurant['category']}"
+                f"{restaurant['category']}"
                 if is_preferred
                 else f"🏷️ {restaurant['category']}"
             )
 
             with st.expander(f"🍽️ {restaurant['name']} - {category_badge}"):
-                col1, col2 = st.columns([1, 2])
-
-                with col1:
-                    # 실제 이미지 URL 사용
-                    st.image(
-                        restaurant.get(
-                            "image_url",
-                            "https://via.placeholder.com/200x150/FF6B6B/FFFFFF?text=Restaurant",
-                        ),
-                        width=200,
-                    )
-
-                with col2:
+                # 이미지 제거하고 정보만 표시
                     st.markdown(
                         f"[{restaurant['name']}](https://place.map.kakao.com/{restaurant['id']})"
                     )
                     if is_preferred:
-                        st.markdown("💖 **선호 카테고리**")
+                        st.markdown("**선호 카테고리**")
                     st.markdown(f"📍 {restaurant['address']}")
                     st.markdown(f"{category_badge}")
-                    st.markdown(
-                        f"⭐ 평점: {restaurant['rating']} ({restaurant['review_count']}개 리뷰)"
-                    )
+                    # st.markdown(
+                    #     f"⭐ 평점: {restaurant['rating']} ({restaurant['review_count']}개 리뷰)"
+                    # )
                     if restaurant.get("distance"):
                         st.markdown(f"🚶‍♂️ 거리: {restaurant['distance']}km")
 
-                    # 평가 슬라이더
+                    # 평가 (st.feedback 사용)
                     rating_key = f"rating_{restaurant['id']}"
-                    # 인덱스를 포함하여 키를 더 고유하게 만듦
-                    unique_rating_key = f"slider_{rating_key}_{i}"
-
-                    rating = st.select_slider(
-                        f"{restaurant['name']} 평가",
-                        options=[0, 1, 2, 3, 4, 5],
-                        format_func=lambda x: "평가 안함" if x == 0 else f"{x}점",
-                        value=st.session_state.restaurant_ratings.get(rating_key, 0),
-                        key=unique_rating_key,
+                    current_rating = st.session_state.restaurant_ratings.get(
+                        rating_key, 0
                     )
 
-                    st.session_state.restaurant_ratings[rating_key] = rating
-
-                    if rating > 0:
+                    # 이미 평가한 경우 수정 가능하도록 안내
+                    if current_rating > 0:
+                        st.success(f"✅ {current_rating}점을 주셨습니다!")
                         rated_count += 1
+                    
+                    # st.feedback 사용 (수정 가능)
+                    feedback = st.feedback(
+                        options="stars",
+                        key=f"feedback_{restaurant['id']}_{i}",
+                    ) + 1
+
+                    # 새로 평가하거나 수정한 경우 처리
+                    if feedback is not None:
+                        if current_rating == 0:
+                            st.success(f"✅ {feedback}점을 주셨습니다!")
+                            rated_count += 1
+                        else:
+                            st.success(f"✅ 평가를 {feedback}점으로 수정하셨습니다!")
+                        
+                        st.session_state.restaurant_ratings[rating_key] = feedback
+
+                    # 피드백 결과 처리
+                    if feedback is not None:
+                        st.session_state.restaurant_ratings[rating_key] = feedback
+                        # st.rerun() 제거 - 성능 개선
 
                         # 높은 점수를 준 음식점의 유사 음식점 표시
-                        if rating >= 4:
+                        current_rating = st.session_state.restaurant_ratings.get(
+                            rating_key, 0
+                        )
+                        if current_rating >= 4:
                             st.success(
-                                f"👍 {rating}점! 비슷한 음식점도 함께 평가해보세요:"
+                                f"👍 {current_rating}점! 비슷한 음식점도 함께 평가해보세요:"
                             )
                             similar_restaurants = (
                                 self.onboarding_manager.get_similar_restaurants(
@@ -595,28 +733,64 @@ class OnboardingPage:
                             )
 
                             for idx, similar in enumerate(similar_restaurants):
-                                similar_key = f"rating_similar_{similar['id']}"
-                                # 부모 음식점 ID를 포함하여 키를 더 고유하게 만듦
-                                unique_slider_key = (
-                                    f"slider_{similar_key}_{restaurant['id']}_{idx}"
-                                )
-                                similar_rating = st.select_slider(
-                                    f"🔗 {similar['name']} (유사 음식점)",
-                                    options=[0, 1, 2, 3, 4, 5],
-                                    format_func=lambda x: "평가 안함"
-                                    if x == 0
-                                    else f"{x}점",
-                                    value=st.session_state.restaurant_ratings.get(
-                                        similar_key, 0
-                                    ),
-                                    key=unique_slider_key,
-                                )
-                                st.session_state.restaurant_ratings[similar_key] = (
-                                    similar_rating
-                                )
+                                # 유사 음식점 정보 표시
+                                with st.expander(
+                                    f"🔗 {similar['name']} - {similar['category']}",
+                                    expanded=False,
+                                ):
+                                    col1, col2 = st.columns([1, 2])
 
-                                if similar_rating > 0:
-                                    rated_count += 1
+                                    with col1:
+                                        # 이미지 표시 (기본 이미지 사용)
+                                        st.image(
+                                            "https://via.placeholder.com/150x100/FF6B6B/FFFFFF?text=Restaurant",
+                                            width=150,
+                                        )
+
+                                    with col2:
+                                        st.markdown(f"**{similar['name']}**")
+                                        st.markdown(f"🏷️ {similar['category']}")
+                                        if similar.get("distance"):
+                                            st.markdown(
+                                                f"🚶‍♂️ 거리: {similar['distance']}km"
+                                            )
+                                        if similar.get("rating"):
+                                            st.markdown(f"⭐ 평점: {similar['rating']}")
+
+                                        # 평가 키 생성
+                                        similar_key = f"rating_similar_{similar['id']}"
+
+                                        # 현재 평가 상태 표시
+                                        current_similar_rating = (
+                                            st.session_state.restaurant_ratings.get(
+                                                similar_key, 0
+                                            )
+                                        )
+                                        if current_similar_rating > 0:
+                                            st.success(
+                                                f"✅ 이미 {current_similar_rating}점을 주셨습니다!"
+                                            )
+                                            rated_count += 1
+
+                                        # st.feedback 사용
+                                        similar_feedback = st.feedback(
+                                            options="stars",
+                                            key=f"feedback_similar_{similar['id']}_{restaurant['id']}_{idx}",
+                                        )
+
+                                        if similar_feedback is not None:
+                                            # 새로 평가한 경우 즉시 표시
+                                            st.success(
+                                                f"✅ {similar_feedback}점을 주셨습니다!"
+                                            )
+                                            rated_count += 1
+
+                                        # 피드백 결과 처리
+                                        if similar_feedback is not None:
+                                            st.session_state.restaurant_ratings[
+                                                similar_key
+                                            ] = similar_feedback
+                                            # st.rerun() 제거 - 성능 개선
 
         # 더 많은 음식점 불러오기 버튼
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -658,23 +832,36 @@ class OnboardingPage:
 
         st.markdown("---")
 
-        # 진행 상황 표시
-        if rated_count >= self.min_ratings_required:
+        # 진행 상황 표시 (모든 평가 유형 포함) - 성능 최적화
+        if "total_rated_count" not in st.session_state:
+            st.session_state.total_rated_count = 0
+
+        # 평가 개수 계산 (캐시된 값 사용)
+        current_total = sum(
+            1 for rating in st.session_state.restaurant_ratings.values() if rating > 0
+        )
+
+        # 변경사항이 있을 때만 업데이트
+        if current_total != st.session_state.total_rated_count:
+            st.session_state.total_rated_count = current_total
+
+        if st.session_state.total_rated_count >= self.min_ratings_required:
             st.success(
-                f"✅ {rated_count}개 음식점 평가 완료! 다음 단계로 진행할 수 있습니다."
+                f"✅ {st.session_state.total_rated_count}개 음식점 평가 완료! 다음 단계로 진행할 수 있습니다."
             )
         else:
             st.warning(
-                f"⚠️ {rated_count}/{self.min_ratings_required}개 평가 완료. {self.min_ratings_required - rated_count}개 더 평가해주세요."
+                f"⚠️ {st.session_state.total_rated_count}/{self.min_ratings_required}개 평가 완료. {self.min_ratings_required - st.session_state.total_rated_count}개 더 평가해주세요."
             )
 
         # 다음 단계 버튼
         self._render_navigation_buttons(
             3,
             5,
-            next_condition=rated_count >= self.min_ratings_required,
+            next_condition=st.session_state.total_rated_count
+            >= self.min_ratings_required,
             next_label="완료 ▶",
-            disabled_label=f"{self.min_ratings_required - rated_count}개 더 평가 필요",
+            disabled_label=f"{self.min_ratings_required - st.session_state.total_rated_count}개 더 평가 필요",
         )
 
     def _render_completion_step(self):
@@ -742,7 +929,47 @@ class OnboardingPage:
             )
             st.write(f"• 평가한 음식점: {rated_count}개")
 
-            # 데이터 저장
+            # 평가 유형별 통계 (캐시된 값 사용)
+        if "rating_stats" not in st.session_state:
+            st.session_state.rating_stats = {"regular": 0, "search": 0, "similar": 0}
+
+        # 평가 통계 계산 (변경사항이 있을 때만)
+        current_stats = {
+            "regular": sum(
+                1
+                for key, rating in st.session_state.restaurant_ratings.items()
+                if rating > 0
+                and not key.startswith("rating_search_")
+                and not key.startswith("rating_similar_")
+            ),
+            "search": sum(
+                1
+                for key, rating in st.session_state.restaurant_ratings.items()
+                if rating > 0 and key.startswith("rating_search_")
+            ),
+            "similar": sum(
+                1
+                for key, rating in st.session_state.restaurant_ratings.items()
+                if rating > 0 and key.startswith("rating_similar_")
+            ),
+        }
+
+        # 변경사항이 있을 때만 업데이트
+        if current_stats != st.session_state.rating_stats:
+            st.session_state.rating_stats = current_stats
+
+        regular_ratings = st.session_state.rating_stats["regular"]
+        search_ratings = st.session_state.rating_stats["search"]
+        similar_ratings = st.session_state.rating_stats["similar"]
+
+        if regular_ratings > 0:
+            st.write(f"  - 추천 음식점: {regular_ratings}개")
+        if search_ratings > 0:
+            st.write(f"  - 검색 음식점: {search_ratings}개")
+        if similar_ratings > 0:
+            st.write(f"  - 유사 음식점: {similar_ratings}개")
+
+        # 데이터 저장
         if st.button("🚀 What2Eat 시작하기!", use_container_width=True, type="primary"):
             # 데이터 유효성 검사
             errors = self.onboarding_manager.validate_onboarding_data(
