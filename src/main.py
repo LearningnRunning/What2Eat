@@ -250,6 +250,13 @@ def user_activity_logs_fragment():
         st.error("로그 시스템을 사용할 수 없습니다.")
 
 
+@st.fragment
+def worldcup_fragment(page_manager: PageManager):
+    """chat_page 부분만 부분 재실행"""
+    st.session_state.fragment_runs += 1
+    page_manager.worldcup_page()
+
+
 def render_authenticated_sidebar():
     """인증된 사용자를 위한 사이드바 렌더링"""
     with st.sidebar:
@@ -272,7 +279,7 @@ def render_authenticated_sidebar():
         st.divider()
 
         # 페이지 선택
-        page_options = ["🤤 오늘 머먹?", "🕺🏽 니가 가본 그집", "📊 내 활동 로그"]
+        page_options = ["🤤 오늘 머먹?", "🕺🏽 니가 가본 그집", "📊 내 활동 로그", "⚽ 맛집 이상형 월드컵"]
         
         # 온보딩 완료 직후라면 chat_page를 기본값으로 설정
         default_index = 0  # 기본적으로 첫 번째 옵션 (chat_page)
@@ -367,6 +374,8 @@ def main():
         ranking_page_fragment(page_manager)
     elif selected_page == "📊 내 활동 로그":
         user_activity_logs_fragment()
+    elif selected_page == "⚽ 맛집 이상형 월드컵":
+        worldcup_fragment(page_manager)
 
 
 if __name__ == "__main__":
