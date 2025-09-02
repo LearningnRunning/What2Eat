@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 import firebase_admin
 import requests
 import streamlit as st
-from firebase_admin import auth
+from firebase_admin import auth, firestore
 
 from config.firebase_config import initialize_firebase_admin
 from utils.firebase_logger import get_firebase_logger
@@ -175,7 +175,7 @@ class FirebaseAuth:
         """비밀번호 재설정 이메일 전송"""
         try:
             # 사용자 존재 여부 확인
-            user = auth.get_user_by_email(email)
+            auth.get_user_by_email(email)
 
             # 비밀번호 재설정 링크 생성
             action_code_settings = auth.ActionCodeSettings(
@@ -208,175 +208,9 @@ class FirebaseAuth:
             return None
 
 
-# def google_auth_component():
-#     """Google 로그인을 위한 HTML/JavaScript 컴포넌트"""
-#     firebase_config = get_firebase_web_config()
-
-#     if not firebase_config.get("apiKey"):
-#         st.error("❌ Firebase 설정이 필요합니다.")
-#         return None
-
-#     html_code = f"""
-#     <!DOCTYPE html>
-#     <html>
-#     <head>
-#         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-#         <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-#         <style>
-#             .auth-container {{
-#                 max-width: 400px;
-#                 margin: 0 auto;
-#                 padding: 20px;
-#                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-#             }}
-
-#             .google-btn {{
-#                 width: 100%;
-#                 height: 50px;
-#                 background-color: #4285f4;
-#                 color: white;
-#                 border: none;
-#                 border-radius: 8px;
-#                 font-size: 16px;
-#                 font-weight: 500;
-#                 cursor: pointer;
-#                 display: flex;
-#                 align-items: center;
-#                 justify-content: center;
-#                 gap: 10px;
-#                 transition: all 0.2s ease;
-#                 margin-bottom: 10px;
-#             }}
-
-#             .google-btn:hover {{
-#                 background-color: #3367d6;
-#                 box-shadow: 0 2px 8px rgba(66, 133, 244, 0.3);
-#             }}
-
-#             .google-btn:disabled {{
-#                 background-color: #cccccc;
-#                 cursor: not-allowed;
-#             }}
-
-#             .error-message {{
-#                 color: #d93025;
-#                 font-size: 14px;
-#                 margin-top: 10px;
-#                 padding: 10px;
-#                 background-color: #fce8e6;
-#                 border-radius: 4px;
-#                 border-left: 3px solid #d93025;
-#             }}
-
-#             .success-message {{
-#                 color: #137333;
-#                 font-size: 14px;
-#                 margin-top: 10px;
-#                 padding: 10px;
-#                 background-color: #e6f4ea;
-#                 border-radius: 4px;
-#                 border-left: 3px solid #137333;
-#             }}
-#         </style>
-#     </head>
-#     <body>
-#         <div class="auth-container">
-#             <button id="google-signin-btn" class="google-btn">
-#                 <svg width="20" height="20" viewBox="0 0 24 24">
-#                     <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-#                     <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-#                     <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-#                     <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-#                 </svg>
-#                 Google로 로그인
-#             </button>
-#             <div id="message"></div>
-#         </div>
-
-#         <script>
-#             const firebaseConfig = {json.dumps(firebase_config)};
-
-#             // Firebase 초기화
-#             firebase.initializeApp(firebaseConfig);
-#             const auth = firebase.auth();
-
-#             // Google 로그인 버튼 이벤트
-#             document.getElementById('google-signin-btn').addEventListener('click', function() {{
-#                 const provider = new firebase.auth.GoogleAuthProvider();
-#                 provider.addScope('email');
-#                 provider.addScope('profile');
-
-#                 this.disabled = true;
-#                 this.textContent = '로그인 중...';
-
-#                 auth.signInWithPopup(provider)
-#                     .then((result) => {{
-#                         const user = result.user;
-#                         const userInfo = {{
-#                             uid: user.uid,
-#                             email: user.email,
-#                             displayName: user.displayName,
-#                             photoURL: user.photoURL,
-#                             emailVerified: user.emailVerified
-#                         }};
-
-#                         // Streamlit으로 사용자 정보 전달
-#                         window.parent.postMessage({{
-#                             type: 'GOOGLE_AUTH_SUCCESS',
-#                             user: userInfo,
-#                             idToken: result.credential.idToken
-#                         }}, '*');
-
-#                         document.getElementById('message').innerHTML =
-#                             '<div class="success-message">✅ 로그인 성공!</div>';
-#                     }})
-#                     .catch((error) => {{
-#                         console.error('로그인 오류:', error);
-#                         document.getElementById('message').innerHTML =
-#                             '<div class="error-message">❌ 로그인 실패: ' + error.message + '</div>';
-
-#                         this.disabled = false;
-#                         this.innerHTML = `
-#                             <svg width="20" height="20" viewBox="0 0 24 24">
-#                                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-#                                 <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-#                                 <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-#                                 <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-#                             </svg>
-#                             Google로 로그인
-#                         `;
-#                     }});
-#             }});
-
-#             // 메시지 리스너 (Streamlit으로부터)
-#             window.addEventListener('message', function(event) {{
-#                 if (event.data.type === 'RESET_GOOGLE_AUTH') {{
-#                     const btn = document.getElementById('google-signin-btn');
-#                     btn.disabled = false;
-#                     btn.innerHTML = `
-#                         <svg width="20" height="20" viewBox="0 0 24 24">
-#                             <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-#                             <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-#                             <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-#                             <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-#                         </svg>
-#                         Google로 로그인
-#                     `;
-#                     document.getElementById('message').innerHTML = '';
-#                 }}
-#             }});
-#         </script>
-#     </body>
-#     </html>
-#     """
-
-#     return components.html(html_code, height=150)
-
-
 def auth_form():
     """통합 인증 폼 (로그인/회원가입/비밀번호 재설정)"""
     firebase_auth = FirebaseAuth()
-    session_manager = get_session_manager()
 
     if not firebase_auth.is_available():
         st.error("❌ Firebase Authentication이 설정되지 않았습니다.")
@@ -551,3 +385,190 @@ def require_auth(func):
         return func(*args, **kwargs)
 
     return wrapper
+
+
+def get_user_profile_from_firestore(uid: str = None) -> Optional[Dict[str, Any]]:
+    """Firestore에서 사용자 프로필 데이터를 조회"""
+    try:
+        # uid가 제공되지 않은 경우 현재 로그인된 사용자의 uid 사용
+        if uid is None:
+            user_info = get_current_user()
+            if not user_info:
+                return None
+            uid = user_info.get("localId")
+            if not uid:
+                return None
+
+        # Firebase Admin SDK가 초기화되었는지 확인
+        try:
+            firebase_admin.get_app()
+        except ValueError:
+            # Firebase Admin SDK 초기화
+            if not initialize_firebase_admin():
+                st.error("❌ Firebase Admin SDK 초기화에 실패했습니다.")
+                return None
+
+        db = firestore.client()
+
+        # onboarding_logs/profile 문서에서 직접 프로필 데이터 조회
+        profile_doc = (
+            db.collection("users")
+            .document(uid)
+            .collection("onboarding_logs")
+            .document("profile")
+            .get()
+        )
+
+        if profile_doc.exists:
+            return profile_doc.to_dict()
+
+        return None
+
+    except Exception as e:
+        st.error(f"❌ 프로필 데이터 조회 중 오류가 발생했습니다: {str(e)}")
+        return None
+
+
+def organize_user_profile_data(profile_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Firestore에서 가져온 프로필 데이터를 정리하는 헬퍼 함수"""
+    if not profile_data:
+        return {}
+
+    try:
+        # 직접 저장된 프로필 데이터 (detail 래핑 없음)
+        organized_data = {
+            # 기본 정보
+            "basic_info": {
+                "age": profile_data.get("birth_year"),
+                "gender": profile_data.get("gender"),
+                "user_id": profile_data.get("user_id"),
+                "created_at": profile_data.get("created_at"),
+                "updated_at": profile_data.get("updated_at"),
+                "onboarding_version": profile_data.get("onboarding_version", "1.0"),
+            },
+            # 예산 정보
+            "budget_info": {
+                "regular_budget": profile_data.get("regular_budget"),
+                "special_budget": profile_data.get("special_budget"),
+            },
+            # 맵기 정보
+            "spice_level": profile_data.get("spice_level"),
+            # 식사 동반자 정보
+            "dining_companions": profile_data.get("dining_companions", []),
+            # 못 먹는 것들
+            "dislikes": profile_data.get("dislikes", []),
+            # 알러지 정보
+            "allergies": profile_data.get("allergies", []),
+            # 선호 카테고리 (대분류)
+            "food_preferences_large": profile_data.get("food_preferences_large", []),
+            # 선호 카테고리 (중분류) - 기존 호환성
+            "food_preferences": profile_data.get("food_preferences", []),
+            # 평점 정보
+            "ratings": profile_data.get("ratings", {}),
+            # 메타 정보
+            "metadata": {
+                "created_at": profile_data.get("created_at"),
+                "updated_at": profile_data.get("updated_at"),
+                "onboarding_version": profile_data.get("onboarding_version"),
+            },
+        }
+
+        return organized_data
+
+    except Exception as e:
+        st.error(f"❌ 프로필 데이터 정리 중 오류가 발생했습니다: {str(e)}")
+        return {}
+
+
+def get_organized_user_profile(uid: str = None) -> Dict[str, Any]:
+    """사용자 프로필 데이터를 조회하고 정리해서 반환하는 통합 함수"""
+    profile_data = get_user_profile_from_firestore(uid)
+    if not profile_data:
+        return {}
+
+    return organize_user_profile_data(profile_data)
+
+
+def get_user_ratings_summary(uid: str = None) -> Dict[str, Any]:
+    """사용자 평점 정보를 요약해서 반환"""
+    try:
+        organized_profile = get_organized_user_profile(uid)
+        if not organized_profile:
+            return {}
+
+        ratings = organized_profile.get("ratings", {})
+        if not ratings:
+            return {
+                "total_rated": 0,
+                "average_rating": 0,
+                "rating_distribution": {},
+                "rated_restaurants": [],
+            }
+
+        # 평점 통계 계산
+        rated_restaurants = []
+        rating_values = []
+        rating_distribution = {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
+
+        for restaurant_idx, rating in ratings.items():
+            if rating is not None:
+                diner_idx_str = restaurant_idx.split("_")[-1]
+                diner_idx = int(diner_idx_str)
+                rated_restaurants.append(
+                    {
+                        "diner_idx": diner_idx,
+                        "rating": rating,
+                    }
+                )
+                rating_values.append(rating)
+                rating_distribution[str(rating)] += 1
+
+        average_rating = sum(rating_values) / len(rating_values) if rating_values else 0
+
+        return {
+            "total_rated": len(rated_restaurants),
+            "average_rating": round(average_rating, 2),
+            "rating_distribution": rating_distribution,
+            "rated_restaurants": sorted(
+                rated_restaurants, key=lambda x: x.get("timestamp", ""), reverse=True
+            ),
+        }
+
+    except Exception as e:
+        st.error(f"❌ 평점 요약 생성 중 오류가 발생했습니다: {str(e)}")
+        return {}
+
+
+def get_user_preferences_summary(uid: str = None) -> Dict[str, Any]:
+    """사용자 선호도 정보를 요약해서 반환"""
+    try:
+        organized_profile = get_organized_user_profile(uid)
+        if not organized_profile:
+            return {}
+
+        return {
+            "spice_level": organized_profile.get("spice_level"),
+            "budget_range": {
+                "regular": organized_profile.get("budget_info", {}).get(
+                    "regular_budget"
+                ),
+                "special": organized_profile.get("budget_info", {}).get(
+                    "special_budget"
+                ),
+            },
+            "dining_companions": organized_profile.get("dining_companions", []),
+            "food_preferences_large": organized_profile.get(
+                "food_preferences_large", []
+            ),
+            "food_preferences": organized_profile.get("food_preferences", []),
+            "dislikes": organized_profile.get("dislikes", []),
+            "allergies": organized_profile.get("allergies", []),
+            "demographic": {
+                "age": organized_profile.get("basic_info", {}).get("age"),
+                "gender": organized_profile.get("basic_info", {}).get("gender"),
+            },
+        }
+
+    except Exception as e:
+        st.error(f"❌ 선호도 요약 생성 중 오류가 발생했습니다: {str(e)}")
+        return {}
