@@ -1,5 +1,6 @@
 # pages/onboarding.py
 
+import pandas as pd
 import streamlit as st
 
 from utils.auth import get_current_user
@@ -32,6 +33,33 @@ class OnboardingPage:
         # 검색 엔진 초기화
         if "search_engine" not in st.session_state:
             st.session_state.search_engine = None
+
+    def _handle_feedback(self, rating_key, feedback_value, current_rating=0):
+        """
+        피드백을 처리하고 저장하는 helper 메서드
+        
+        Args:
+            rating_key: 세션 상태에서 사용할 평가 키
+            feedback_value: st.feedback()에서 반환된 값 (0-4)
+            current_rating: 현재 저장된 평가값
+            
+        Returns:
+            bool: 평가가 업데이트되었는지 여부
+        """
+        if feedback_value is not None:
+            # st.feedback은 0-indexed (0-4)를 반환하므로 1을 더해서 1-5로 변환
+            feedback_value = feedback_value + 1
+            
+            # 현재 평점 여부에 따라 다른 메시지 표시
+            if current_rating == 0:
+                st.success(f"✅ {feedback_value}점을 주셨습니다!")
+            else:
+                st.success(f"✅ 평가를 {feedback_value}점으로 수정하셨습니다!")
+            
+            # 세션 상태에 저장
+            st.session_state.restaurant_ratings[rating_key] = feedback_value
+            return True
+        return False
 
     def _initialize_search_engine(self):
         """검색 엔진을 초기화합니다."""
@@ -141,20 +169,16 @@ class OnboardingPage:
                             key=f"feedback_search_{row['idx']}_{i}",
                         )
 
-                        # 새로 평가하거나 수정한 경우 처리
-                        if feedback is not None:
-                            if current_rating == 0:
-                                st.success(f"✅ {feedback}점을 주셨습니다!")
-                            else:
-                                st.success(
-                                    f"✅ 평가를 {feedback}점으로 수정하셨습니다!"
-                                )
-
-                            st.session_state.restaurant_ratings[rating_key] = feedback
+                        # 피드백 처리 (helper 메서드 사용)
+                        self._handle_feedback(rating_key, feedback, current_rating)
 
     def _handle_current_location(self):
         """현재 위치 찾기 helper 함수"""
-        from streamlit_geolocation import streamlit_geolocation
+        try:
+            from streamlit_geolocation import streamlit_geolocation
+        except ImportError:
+            st.error("streamlit_geolocation 패키지가 설치되지 않았습니다.")
+            return
 
         from utils.geolocation import geocode, save_user_location
 
@@ -708,29 +732,20 @@ class OnboardingPage:
                     rated_count += 1
 
                 # st.feedback 사용 (수정 가능)
-                feedback = (
-                    st.feedback(
-                        options="stars",
-                        key=f"feedback_{restaurant['id']}_{i}",
-                    )
-                    + 1
+                feedback = st.feedback(
+                    options="stars",
+                    key=f"feedback_{restaurant['id']}_{i}",
                 )
 
-                # 새로 평가하거나 수정한 경우 처리
+                # 피드백 처리 (helper 메서드 사용)
                 if feedback is not None:
-                    if current_rating == 0:
-                        st.success(f"✅ {feedback}점을 주셨습니다!")
+                    # 평가가 업데이트되었는지 확인
+                    was_new = current_rating == 0
+                    self._handle_feedback(rating_key, feedback, current_rating)
+                    
+                    if was_new:
                         rated_count += 1
-                    else:
-                        st.success(f"✅ 평가를 {feedback}점으로 수정하셨습니다!")
-
-                    st.session_state.restaurant_ratings[rating_key] = feedback
-
-                # 피드백 결과 처리
-                if feedback is not None:
-                    st.session_state.restaurant_ratings[rating_key] = feedback
-                    # st.rerun() 제거 - 성능 개선
-
+                    
                     # 높은 점수를 준 음식점의 유사 음식점 표시
                     current_rating = st.session_state.restaurant_ratings.get(
                         rating_key, 0
@@ -791,19 +806,13 @@ class OnboardingPage:
                                         key=f"feedback_similar_{similar['id']}_{restaurant['id']}_{idx}",
                                     )
 
+                                    # 피드백 처리 (helper 메서드 사용)
                                     if similar_feedback is not None:
-                                        # 새로 평가한 경우 즉시 표시
-                                        st.success(
-                                            f"✅ {similar_feedback}점을 주셨습니다!"
-                                        )
-                                        rated_count += 1
-
-                                    # 피드백 결과 처리
-                                    if similar_feedback is not None:
-                                        st.session_state.restaurant_ratings[
-                                            similar_key
-                                        ] = similar_feedback
-                                        # st.rerun() 제거 - 성능 개선
+                                        was_new_similar = current_similar_rating == 0
+                                        self._handle_feedback(similar_key, similar_feedback, current_similar_rating)
+                                        
+                                        if was_new_similar:
+                                            rated_count += 1
 
         # 더 많은 음식점 불러오기 버튼
         col1, col2, col3 = st.columns([1, 2, 1])
