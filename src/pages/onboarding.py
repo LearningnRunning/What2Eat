@@ -144,6 +144,9 @@ class OnboardingPage:
 
                         # 새로 평가하거나 수정한 경우 처리
                         if feedback is not None:
+                            # st.feedback은 0-indexed (0-4)를 반환하므로 1을 더해서 1-5로 변환
+                            feedback = feedback + 1
+                            
                             if current_rating == 0:
                                 st.success(f"✅ {feedback}점을 주셨습니다!")
                             else:
