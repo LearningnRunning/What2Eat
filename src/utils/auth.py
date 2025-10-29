@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
@@ -9,6 +10,39 @@ from firebase_admin import auth, firestore
 from config.firebase_config import initialize_firebase_admin
 from utils.firebase_logger import get_firebase_logger
 from utils.session_manager import get_session_manager
+
+
+def map_kr_jamo_to_en(text: str) -> str:
+    """한글(두벌식) 자모를 대응하는 QWERTY 영문 키로 변환합니다.
+
+    - 단일 자모는 1:1 매핑 (예: ㅋ -> 'z', ㅈ -> 'w')
+    - 합성 모음은 실제 키 입력 두 글자로 매핑 (예: ㅘ -> 'hk', ㅝ -> 'nj')
+    - 영문/숫자/기호는 그대로 유지
+    """
+    mapping = {
+        # 자음/모음 (단일)
+        "ㅂ": "q", "ㅈ": "w", "ㄷ": "e", "ㄱ": "r", "ㅅ": "t",
+        "ㅛ": "y", "ㅕ": "u", "ㅑ": "i", "ㅐ": "o", "ㅔ": "p",
+        "ㅁ": "a", "ㄴ": "s", "ㅇ": "d", "ㄹ": "f", "ㅎ": "g",
+        "ㅗ": "h", "ㅓ": "j", "ㅏ": "k", "ㅣ": "l",
+        "ㅋ": "z", "ㅌ": "x", "ㅊ": "c", "ㅍ": "v", "ㅠ": "b",
+        "ㅜ": "n", "ㅡ": "m",
+        # 된소리 (Shift)
+        "ㅃ": "Q", "ㅉ": "W", "ㄸ": "E", "ㄲ": "R", "ㅆ": "T",
+        # 합성 모음
+        "ㅘ": "hk", "ㅙ": "ho", "ㅚ": "hl",
+        "ㅝ": "nj", "ㅞ": "np", "ㅟ": "nl",
+        "ㅢ": "ml",
+        # 드문 모음
+        "ㅒ": "O", "ㅖ": "P",
+    }
+
+    if not re.search(r"[\u3131-\u318E]", text):
+        return text
+    out = []
+    for ch in text:
+        out.append(mapping.get(ch, ch))
+    return "".join(out)
 
 
 class FirebaseAuth:
@@ -86,6 +120,9 @@ class FirebaseAuth:
     def sign_in_with_email(self, email: str, password: str) -> Optional[Dict[str, Any]]:
         """이메일과 비밀번호로 로그인 (Firebase REST API 사용)"""
         try:
+            # KR→EN 키보드 매핑 적용 비밀번호 생성
+            mapped_password = map_kr_jamo_to_en(password)
+            
             # Firebase Web API Key 가져오기
             FIREBASE_WEB_API_KEY = st.secrets["FIREBASE_WEB_API_KEY"]
 
@@ -94,9 +131,16 @@ class FirebaseAuth:
                 return None
 
             # Firebase Authentication REST API를 사용하여 인증
+            # 1) 원본 비밀번호 시도
             auth_result = self._authenticate_user_with_rest_api(
                 email, password, FIREBASE_WEB_API_KEY
             )
+
+            # 2) 실패했고, 매핑 비밀번호가 다르면 매핑 비밀번호로 재시도
+            if (not auth_result.get("success")) and mapped_password != password:
+                auth_result = self._authenticate_user_with_rest_api(
+                    email, mapped_password, FIREBASE_WEB_API_KEY
+                )
 
             if auth_result["success"]:
                 user_data = {
