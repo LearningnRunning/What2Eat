@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
+import extra_streamlit_components as stx
 import streamlit as st
 from firebase_admin import auth
 
@@ -12,6 +13,9 @@ class SessionManager:
 
     def __init__(self):
         self.logger = get_firebase_logger()
+        self.cookie_manager = stx.CookieManager()
+        self.cookie_key = "auth_token"
+        self.refresh_cookie_key = "refresh_token"
         self._initialize_session_state()
 
     def _initialize_session_state(self):
@@ -26,6 +30,8 @@ class SessionManager:
             st.session_state.token_expires_at = None
         if "refresh_token" not in st.session_state:
             st.session_state.refresh_token = None
+        if "cookie_set_counter" not in st.session_state:
+            st.session_state.cookie_set_counter = 0
 
     def save_user_session(
         self, user_data: Dict[str, Any], id_token: str, refresh_token: str = None
@@ -42,6 +48,35 @@ class SessionManager:
             st.session_state.token_expires_at = expires_at
             st.session_state.refresh_token = refresh_token
 
+            # 쿠키에도 저장 (새로고침 시 세션 복원용)
+            try:
+                # 각 set() 호출에 고유한 key 제공 (Streamlit 컴포넌트 요구사항)
+                # 카운터를 사용하여 고유성 보장
+                if "cookie_set_counter" not in st.session_state:
+                    st.session_state.cookie_set_counter = 0
+                st.session_state.cookie_set_counter += 1
+                counter = st.session_state.cookie_set_counter
+                
+                # 토큰을 쿠키에 저장 (30일 유효)
+                self.cookie_manager.set(
+                    self.cookie_key, 
+                    id_token, 
+                    expires_at=datetime.now() + timedelta(days=30),
+                    key=f"cookie_set_{self.cookie_key}_{counter}"
+                )
+                if refresh_token:
+                    st.session_state.cookie_set_counter += 1
+                    counter = st.session_state.cookie_set_counter
+                    self.cookie_manager.set(
+                        self.refresh_cookie_key, 
+                        refresh_token, 
+                        expires_at=datetime.now() + timedelta(days=30),
+                        key=f"cookie_set_{self.refresh_cookie_key}_{counter}"
+                    )
+            except Exception as cookie_error:
+                # 쿠키 저장 실패는 경고만 표시하고 계속 진행
+                st.warning(f"쿠키 저장 실패 (세션은 유지됨): {str(cookie_error)}")
+
             # 로그인 로그 기록
             if self.logger.is_available():
                 self.logger.log_login(user_data.get("localId"), "email")
@@ -52,9 +87,23 @@ class SessionManager:
             return False
 
     def load_session_from_browser(self) -> bool:
-        """브라우저에서 세션 복원 (Streamlit 세션 상태 기반)"""
+        """브라우저에서 세션 복원 (쿠키 우선, Streamlit 세션 상태 기반)"""
         try:
-            # Streamlit 세션 상태에서 복원 시도
+            # 먼저 쿠키에서 토큰 복원 시도
+            token = self.cookie_manager.get(self.cookie_key)
+            refresh_token = self.cookie_manager.get(self.refresh_cookie_key)
+            
+            if token:
+                # 쿠키에서 토큰을 찾았으면 세션 상태에 저장하고 검증
+                st.session_state.auth_token = token
+                st.session_state.refresh_token = refresh_token
+                
+                # Firebase에서 토큰 유효성 검증
+                if self._verify_token_with_firebase():
+                    st.session_state.is_authenticated = True
+                    return True
+            
+            # 쿠키에 토큰이 없으면 Streamlit 세션 상태에서 복원 시도
             return self._restore_from_session_state()
 
         except Exception as e:
@@ -179,6 +228,22 @@ class SessionManager:
     def clear_session(self):
         """세션 정보 완전 삭제"""
         try:
+            # 쿠키 삭제
+            try:
+                if "cookie_set_counter" not in st.session_state:
+                    st.session_state.cookie_set_counter = 0
+                    
+                if self.cookie_manager.get(self.cookie_key):
+                    st.session_state.cookie_set_counter += 1
+                    counter = st.session_state.cookie_set_counter
+                    self.cookie_manager.delete(self.cookie_key, key=f"cookie_delete_{self.cookie_key}_{counter}")
+                if self.cookie_manager.get(self.refresh_cookie_key):
+                    st.session_state.cookie_set_counter += 1
+                    counter = st.session_state.cookie_set_counter
+                    self.cookie_manager.delete(self.refresh_cookie_key, key=f"cookie_delete_{self.refresh_cookie_key}_{counter}")
+            except Exception:
+                pass
+            
             # Streamlit 세션 상태 초기화
             st.session_state.user_info = None
             st.session_state.is_authenticated = False

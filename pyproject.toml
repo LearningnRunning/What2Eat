@@ -47,6 +47,7 @@ dependencies = [
     "fuzzywuzzy>=0.18.0",
     "jamo>=0.4.1",
     "python-levenshtein>=0.27.1",
+    "extra-streamlit-components>=0.1.0",
 ]
 
 [tool.hatch.build.targets.wheel]
