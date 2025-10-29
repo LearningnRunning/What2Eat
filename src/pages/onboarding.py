@@ -1,5 +1,6 @@
 # pages/onboarding.py
 
+import pandas as pd
 import streamlit as st
 
 from utils.auth import get_current_user
@@ -154,7 +155,11 @@ class OnboardingPage:
 
     def _handle_current_location(self):
         """현재 위치 찾기 helper 함수"""
-        from streamlit_geolocation import streamlit_geolocation
+        try:
+            from streamlit_geolocation import streamlit_geolocation
+        except ImportError:
+            st.error("streamlit_geolocation 패키지가 설치되지 않았습니다.")
+            return
 
         from utils.geolocation import geocode, save_user_location
 
@@ -708,13 +713,14 @@ class OnboardingPage:
                     rated_count += 1
 
                 # st.feedback 사용 (수정 가능)
-                feedback = (
-                    st.feedback(
-                        options="stars",
-                        key=f"feedback_{restaurant['id']}_{i}",
-                    )
-                    + 1
+                feedback = st.feedback(
+                    options="stars",
+                    key=f"feedback_{restaurant['id']}_{i}",
                 )
+
+                # feedback이 None이 아닌 경우에만 +1 처리
+                if feedback is not None:
+                    feedback = feedback + 1
 
                 # 새로 평가하거나 수정한 경우 처리
                 if feedback is not None:
@@ -798,8 +804,7 @@ class OnboardingPage:
                                         )
                                         rated_count += 1
 
-                                    # 피드백 결과 처리
-                                    if similar_feedback is not None:
+                                        # 피드백 결과 처리
                                         st.session_state.restaurant_ratings[
                                             similar_key
                                         ] = similar_feedback

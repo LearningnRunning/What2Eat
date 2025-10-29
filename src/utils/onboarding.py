@@ -76,6 +76,13 @@ class OnboardingManager:
             else:
                 distance = round(float(distance), 1)
 
+            # diner_menu_name 처리 - list 타입이면 문자열로 변환
+            specialties = row.get("diner_menu_name", [])
+            if isinstance(specialties, list):
+                specialties = specialties[:3]
+            else:
+                specialties = []
+
             restaurant = {
                 "id": str(row.get("diner_idx", "")),
                 "name": row.get("diner_name", ""),
@@ -85,9 +92,7 @@ class OnboardingManager:
                 "rating": rating,
                 "review_count": review_count,
                 "price_range": "정보 없음",
-                "specialties": row.get("diner_menu_name", [])[:3]
-                if row.get("diner_menu_name")
-                else [],
+                "specialties": specialties,
                 "distance": distance,
             }
             restaurants.append(restaurant)
@@ -159,6 +164,13 @@ class OnboardingManager:
             else:
                 diner_grade = float(diner_grade)
 
+            # diner_menu_name 처리 - list 타입이면 문자열로 변환
+            specialties = row.get("diner_menu_name", [])
+            if isinstance(specialties, list):
+                specialties = specialties[:3]
+            else:
+                specialties = []
+
             restaurant = {
                 "id": str(row.get("diner_idx", "")),
                 "name": row.get("diner_name", ""),
@@ -168,9 +180,7 @@ class OnboardingManager:
                 "rating": rating,
                 "review_count": review_count,
                 "price_range": "정보 없음",
-                "specialties": row.get("diner_menu_name", [])[:3]
-                if row.get("diner_menu_name")
-                else [],
+                "specialties": specialties,
                 "distance": distance,
                 "diner_grade": diner_grade,
                 "is_preferred": restaurant_category in preferred_categories,
@@ -275,8 +285,8 @@ class OnboardingManager:
         df_sorted = df_quality.sort_values(by="diner_grade", ascending=False)
 
         # limit 개수만큼 선택
-        df_selected = df_sorted.head(limit)
-        df_selected["diner_review_cnt"].fillna(0, inplace=True)
+        df_selected = df_sorted.head(limit).copy()
+        df_selected["diner_review_cnt"] = df_selected["diner_review_cnt"].fillna(0)
 
         # 결과를 딕셔너리 리스트로 변환
         similar_restaurants = []
@@ -300,14 +310,19 @@ class OnboardingManager:
             else:
                 distance = round(float(distance), 1)
 
+            # diner_menu_name 처리 - list 타입이면 문자열로 변환
+            specialties = row.get("diner_menu_name", [])
+            if isinstance(specialties, list):
+                specialties = specialties[:2]
+            else:
+                specialties = []
+
             restaurant = {
                 "id": str(row.get("diner_idx", "")),
                 "name": row.get("diner_name", ""),
                 "category": row.get("diner_category_large", ""),
                 "rating": diner_grade,
-                "specialties": row.get("diner_menu_name", [])[:2]
-                if row.get("diner_menu_name")
-                else [],
+                "specialties": specialties,
                 "distance": distance,
                 "review_count": review_count,
             }
@@ -771,7 +786,6 @@ class OnboardingManager:
         limit: int = 1,
     ) -> List[Dict[str, Any]]:
         """예산 친화적 추천 (분식, 한식 등 가성비 좋은 카테고리 우선)"""
-        budget_friendly_categories = ["분식", "한식", "치킨", "중식", "패스트푸드"]
 
         # 예산에 따른 카테고리 우선순위 조정
         if "1만원" in budget or "만원 이하" in budget:
@@ -885,6 +899,13 @@ class OnboardingManager:
             else:
                 distance = round(float(distance), 1)
 
+            # diner_menu_name 처리 - list 타입이면 문자열로 변환
+            specialties = row.get("diner_menu_name", [])
+            if isinstance(specialties, list):
+                specialties = specialties[:3]
+            else:
+                specialties = []
+
             recommendation = {
                 "id": str(row.get("diner_idx", "")),
                 "name": row.get("diner_name", ""),
@@ -894,9 +915,7 @@ class OnboardingManager:
                 "rating": diner_grade,  # 호환성을 위해 중복
                 "review_count": review_count,
                 "distance": distance,
-                "specialties": row.get("diner_menu_name", [])[:3]
-                if row.get("diner_menu_name")
-                else [],
+                "specialties": specialties,
                 "price_range": "정보 없음",
             }
             recommendations.append(recommendation)
