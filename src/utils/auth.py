@@ -216,27 +216,45 @@ class FirebaseAuth:
             return {"success": False, "error": f"인증 실패: {str(e)}"}
 
     def reset_password(self, email: str) -> bool:
-        """비밀번호 재설정 이메일 전송"""
+        """비밀번호 재설정 이메일 전송 (Firebase REST API 사용)"""
         try:
-            # 사용자 존재 여부 확인
-            auth.get_user_by_email(email)
+            # Firebase Web API Key 가져오기
+            FIREBASE_WEB_API_KEY = st.secrets["FIREBASE_WEB_API_KEY"]
 
-            # 비밀번호 재설정 링크 생성
-            action_code_settings = auth.ActionCodeSettings(
-                url=f"https://{st.get_option('browser.serverAddress')}/reset-password",
-                handle_code_in_app=True,
-            )
+            if not FIREBASE_WEB_API_KEY:
+                st.error("❌ Firebase Web API Key가 설정되지 않았습니다.")
+                return False
 
-            # 재설정 링크 이메일 전송
-            auth.generate_password_reset_link(
-                email, action_code_settings=action_code_settings
-            )
-            return True
-        except auth.UserNotFoundError:
-            st.error("❌ 등록되지 않은 이메일입니다.")
+            # Firebase REST API를 사용하여 비밀번호 재설정 이메일 전송
+            url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={FIREBASE_WEB_API_KEY}"
+
+            payload = {
+                "requestType": "PASSWORD_RESET",
+                "email": email
+            }
+
+            response = requests.post(url, json=payload)
+
+            if response.status_code == 200:
+                return True
+            else:
+                # 에러 응답 처리
+                error_data = response.json()
+                error_message = error_data.get("error", {}).get("message", "알 수 없는 오류")
+                
+                if "EMAIL_NOT_FOUND" in error_message:
+                    st.error("❌ 등록되지 않은 이메일입니다.")
+                elif "INVALID_EMAIL" in error_message:
+                    st.error("❌ 유효하지 않은 이메일 형식입니다.")
+                elif "MISSING_EMAIL" in error_message:
+                    st.error("❌ 이메일을 입력해주세요.")
+                else:
+                    st.error(f"❌ 비밀번호 재설정 중 오류가 발생했습니다: {error_message}")
+                return False
+
         except Exception as e:
             st.error(f"❌ 비밀번호 재설정 중 오류가 발생했습니다: {str(e)}")
-        return False
+            return False
 
     def sign_out(self):
         """로그아웃"""
