@@ -42,3 +42,30 @@ GRADE_COLORS = {
 }
 
 GRADE_MAP = {"🌟": 1, "🌟��": 2, "🌟🌟🌟": 3}
+
+# large category sorted by priority
+LARGE_CATEGORIES = [
+    "한식",
+    "술집",
+    "양식",
+    "일식",
+    "중식",
+    "아시아음식",
+    "카페",
+    "간식",
+    "기타",
+    "식품판매",
+    "여가시설",
+    "유아",
+    "전문대행",
+]
+
+LARGE_CATEGORIES_NOT_USED = [
+    "카페",
+    "간식",
+    "기타",
+    "식품판매",
+    "여가시설",
+    "유아",
+    "전문대행",
+]

@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from pages import search_map_page
+from config.constants import LARGE_CATEGORIES, LARGE_CATEGORIES_NOT_USED
 from utils.app import What2EatApp
 from utils.dialogs import change_location
 from utils.firebase_logger import get_firebase_logger
@@ -62,7 +63,7 @@ def render_filter_ui(app: What2EatApp, search_filter: SearchFilter):
     st.markdown("### 🍽️ 카테고리")
 
     # 대분류 카테고리
-    large_categories = sorted(app.df_diner["diner_category_large"].dropna().unique())
+    large_categories = [cat for cat in LARGE_CATEGORIES if cat not in LARGE_CATEGORIES_NOT_USED]
     selected_large = st.multiselect(
         "대분류 카테고리",
         options=large_categories,
