@@ -58,7 +58,56 @@ def render_filter_ui(app: What2EatApp, search_filter: SearchFilter):
 
     st.markdown("---")
 
-    # 폼으로 필터 감싸기
+    # 카테고리 선택 (폼 외부 - 동적 업데이트를 위해)
+    st.markdown("### 🍽️ 카테고리")
+
+    # 대분류 카테고리
+    large_categories = sorted(app.df_diner["diner_category_large"].dropna().unique())
+    selected_large = st.multiselect(
+        "대분류 카테고리",
+        options=large_categories,
+        default=st.session_state.search_filters["large_categories"],
+        help="대분류를 선택하면 해당하는 중분류만 표시됩니다",
+        key="large_category_filter"
+    )
+
+    # 중분류 카테고리 (대분류 선택에 따라 동적으로 필터링)
+    if selected_large:
+        df_filtered_by_large = app.df_diner[
+            app.df_diner["diner_category_large"].isin(selected_large)
+        ]
+        middle_categories = sorted(
+            df_filtered_by_large["diner_category_middle"].dropna().unique()
+        )
+        
+        # 이전에 선택된 중분류 중 현재 대분류에 해당하는 것만 유지
+        valid_middle_defaults = [
+            cat
+            for cat in st.session_state.search_filters["middle_categories"]
+            if cat in middle_categories
+        ]
+        
+        selected_middle = st.multiselect(
+            "중분류 카테고리",
+            options=middle_categories,
+            default=valid_middle_defaults,
+            help=f"{len(middle_categories)}개의 중분류 카테고리 사용 가능",
+            key="middle_category_filter"
+        )
+    else:
+        # 대분류가 선택되지 않은 경우 빈 목록 표시
+        selected_middle = st.multiselect(
+            "중분류 카테고리",
+            options=[],
+            default=[],
+            disabled=True,
+            help="먼저 대분류 카테고리를 선택해주세요",
+            key="middle_category_filter"
+        )
+
+    st.markdown("---")
+
+    # 폼으로 나머지 필터 감싸기
     with st.form("search_filter_form", clear_on_submit=False):
         # 반경 설정
         radius_km = st.slider(
@@ -68,39 +117,6 @@ def render_filter_ui(app: What2EatApp, search_filter: SearchFilter):
             value=st.session_state.search_filters["radius_km"],
             step=0.5,
         )
-
-        # 카테고리 선택
-        st.markdown("### 🍽️ 카테고리")
-
-        # 대분류 카테고리
-        large_categories = sorted(app.df_diner["diner_category_large"].dropna().unique())
-        selected_large = st.multiselect(
-            "대분류 카테고리",
-            options=large_categories,
-            default=st.session_state.search_filters["large_categories"],
-        )
-
-        # 중분류 카테고리 (대분류 선택 시 활성화)
-        middle_categories = []
-        if selected_large:
-            df_filtered_by_large = app.df_diner[
-                app.df_diner["diner_category_large"].isin(selected_large)
-            ]
-            middle_categories = sorted(
-                df_filtered_by_large["diner_category_middle"].dropna().unique()
-            )
-
-            selected_middle = st.multiselect(
-                "중분류 카테고리",
-                options=middle_categories,
-                default=[
-                    cat
-                    for cat in st.session_state.search_filters["middle_categories"]
-                    if cat in middle_categories
-                ],
-            )
-        else:
-            selected_middle = []
 
         # 정렬 기준
         st.markdown("### 📊 정렬 기준")
@@ -128,7 +144,7 @@ def render_filter_ui(app: What2EatApp, search_filter: SearchFilter):
         submitted = st.form_submit_button("🔍 검색하기", type="primary", use_container_width=True)
 
         if submitted:
-            # 폼 제출 시 세션 상태 업데이트
+            # 폼 제출 시 세션 상태 업데이트 (카테고리는 폼 외부에서 이미 처리됨)
             st.session_state.search_filters["radius_km"] = radius_km
             st.session_state.search_filters["large_categories"] = selected_large
             st.session_state.search_filters["middle_categories"] = selected_middle
