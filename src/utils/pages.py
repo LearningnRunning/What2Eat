@@ -14,6 +14,7 @@ from utils.dialogs import change_location, show_restaurant_map
 from utils.firebase_logger import get_firebase_logger
 from utils.onboarding import get_onboarding_manager
 from utils.ui_components import choice_avatar, display_results, my_chat_message
+from utils.worldcup import get_worldcup_manager
 
 
 class PageManager:
@@ -525,132 +526,7 @@ class PageManager:
     def worldcup_page(self):
         # 페이지 방문 로그
         self._log_user_activity("page_visit", {"page_name": "worldcup"})
-
-        import math
-        import random
-
-        st.session_state.fragment_runs = st.session_state.get("fragment_runs", 0) + 1
-        st.title("⚽ 맛집 이상형 월드컵")
-        df_diner = self.app.df_diner
-
-        # 세션 초기화
-        for key, default in {
-            "round": 1,
-            "matches": [],
-            "current_match_index": 0,
-            "winners": []
-        }.items():
-            if key not in st.session_state:
-                st.session_state[key] = default
-
-        CATEGORY_ICONS = {
-            "카페": "☕",
-            "일식": "🍜",
-            "한식": "🍲",
-            "양식": "🍝",
-            "디저트": "🍰",
-            "기타": "🍽"
-        }
-
-        def get_category_text(large, middle):
-            large = None if (large is None or (isinstance(large, float) and math.isnan(large))) else large
-            middle = None if (middle is None or (isinstance(middle, float) and math.isnan(middle))) else middle
-            if not large and not middle:
-                return "음식점"
-            elif large and middle:
-                return f"{large} — {middle}"
-            else:
-                return large or middle
-
-        def start_tournament(size=8):
-            candidates = df_diner.sample(n=size).to_dict("records")
-            random.shuffle(candidates)
-            matches = []
-            for i in range(0, len(candidates), 2):
-                pair = candidates[i:i + 2]
-                if len(pair) == 2:
-                    matches.append(pair)
-                else:
-                    matches.append([pair[0], None])
-            st.session_state.matches = matches
-            st.session_state.current_match_index = 0
-            st.session_state.round = 1
-            st.session_state.winners = []
-
-        def select_winner(winner_idx):
-            # 현재 매치에서 선택된 winner 저장
-            winner = st.session_state.matches[st.session_state.current_match_index][winner_idx]
-            st.session_state.winners.append(winner)
-            st.session_state.current_match_index += 1
-
-            # 라운드 종료 시
-            if st.session_state.current_match_index >= len(st.session_state.matches):
-                if len(st.session_state.winners) == 1:
-                    st.session_state.matches = []
-                    st.success(f"🏆 최종 우승: {st.session_state.winners[0]['diner_name']}")
-                    st.markdown(f"[음식점 보기]({st.session_state.winners[0]['diner_url']})")
-                    return
-                # 다음 라운드 매치 준비
-                next_matches = []
-                w = st.session_state.winners
-                for i in range(0, len(w), 2):
-                    pair = w[i:i+2]
-                    if len(pair) == 2:
-                        next_matches.append(pair)
-                    else:
-                        next_matches.append([pair[0], None])
-                st.session_state.matches = next_matches
-                st.session_state.winners = []
-                st.session_state.current_match_index = 0
-                st.session_state.round += 1
-
-        # 토너먼트 시작
-        if st.button("토너먼트 시작", type="primary"):
-            start_tournament(size=8)
-
-        # 현재 매치 출력
-        if st.session_state.matches and st.session_state.current_match_index < len(st.session_state.matches):
-            st.markdown(
-                f"<h3 style='text-align:center;'>Round {st.session_state.round} — Match {st.session_state.current_match_index + 1}/{len(st.session_state.matches)}</h3>",
-                unsafe_allow_html=True
-            )
-
-            current_match = st.session_state.matches[st.session_state.current_match_index]
-            col1, col2 = st.columns(2)
-
-            for idx, col in enumerate([col1, col2]):
-                with col:
-                    if idx < len(current_match) and current_match[idx]:
-                        r = current_match[idx]
-                        st.markdown(
-                            f"""
-                            <div style='border: 1px solid #e0e0e0; border-radius: 12px;
-                                        padding: 20px; text-align: center; 
-                                        background-color: #ffffff;
-                                        box-shadow: 0px 2px 6px rgba(0,0,0,0.05);
-                                        margin-bottom: 20px;'>
-                                <div style='font-size:60px;'>{CATEGORY_ICONS.get(r["diner_category_large"], "🍽")}</div>
-                                <h4 style='margin-top: 10px; margin-bottom: 5px;'>{r['diner_name']}</h4>
-                                <p style='color: gray; margin-top: 0;'>{get_category_text(r['diner_category_large'], r.get('diner_category_middle', None))}</p>
-                                <a href='{r["diner_url"]}' target='_blank' style='
-                                    display:inline-block;
-                                    padding:8px 16px;
-                                    margin-top:10px;
-                                    background-color:#1f77b4;
-                                    color:white;
-                                    border-radius:6px;
-                                    text-decoration:none;
-                                '>🔍 음식점 보기</a>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                        st.button(
-                            "✅ 선택",
-                            key=f"select_button_{r['diner_idx']}",
-                            on_click=select_winner,
-                            args=(idx,),
-                            use_container_width=True
-                        )
-                    else:
-                        st.write("자동 진출 (bye)")
+        
+        # WorldCupManager 사용
+        worldcup_manager = get_worldcup_manager(self.app.df_diner)
+        worldcup_manager.render_worldcup_page()
