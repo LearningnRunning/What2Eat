@@ -11,7 +11,7 @@ import requests
 class WorldCupManager:
     """맛집 월드컵 관리 클래스"""
     
-    def __init__(self, df_diner: pd.DataFrame, redis_api_url: str = "http://1.212.63.162:61231/api/v1/redis/read"):
+    def __init__(self, df_diner: pd.DataFrame, redis_api_url: str = st.secrets["REDIS_API_URL"]):
         self.df_diner = df_diner
         self.redis_api_url = redis_api_url
         self.category_icons = {
