@@ -40,7 +40,7 @@ def load_app_data(use_api: bool = False, api_url: str = None):
 class What2EatApp:
     """What2Eat 앱의 메인 클래스"""
 
-    def __init__(self, use_api: bool = True, api_url: str = None):
+    def __init__(self, use_api: bool = False, api_url: str = None):
         """
         What2EatApp 초기화
         

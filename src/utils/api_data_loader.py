@@ -51,7 +51,7 @@ def load_diners_from_api(
             params["limit"] = limit
         
         # API 요청
-        response = requests.get(endpoint, params=params, timeout=30)
+        response = requests.get(endpoint, params=params, timeout=60)
         response.raise_for_status()
         
         # JSON 데이터를 DataFrame으로 변환
@@ -119,7 +119,7 @@ def load_diners_with_filters(
         if min_rating is not None:
             params["min_rating"] = min_rating
         
-        response = requests.get(endpoint, params=params, timeout=30)
+        response = requests.get(endpoint, params=params, timeout=60)
         response.raise_for_status()
         
         diners_data = response.json()
