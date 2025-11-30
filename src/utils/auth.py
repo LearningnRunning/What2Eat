@@ -105,6 +105,36 @@ class FirebaseAuth:
                 None,  # 회원가입 시에는 refresh_token이 없음
             )
 
+            # PostgreSQL에 사용자 동기화 (비동기 처리)
+            try:
+                import asyncio
+
+                from utils.api_client import get_yamyam_ops_client
+
+                client = get_yamyam_ops_client()
+                if client:
+                    # 비동기 함수를 동기적으로 실행
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    success = loop.run_until_complete(
+                        client.sync_user_from_firebase(
+                            user.uid, user.email, user.display_name or email.split("@")[0]
+                        )
+                    )
+                    loop.close()
+
+                    if success:
+                        st.success("✅ 사용자 정보가 동기화되었습니다.")
+                    else:
+                        st.warning(
+                            "⚠️ 사용자 정보 동기화에 실패했습니다. 나중에 다시 시도됩니다."
+                        )
+                else:
+                    st.warning("⚠️ API 클라이언트를 초기화할 수 없습니다.")
+            except Exception as sync_error:
+                # 동기화 실패해도 회원가입은 성공으로 처리
+                st.warning(f"⚠️ 사용자 정보 동기화 중 오류: {str(sync_error)}")
+
             return user_data
 
         except auth.EmailAlreadyExistsError:
@@ -155,11 +185,22 @@ class FirebaseAuth:
                     "disabled": False,
                 }
 
+                # yamyam-ops의 /login 엔드포인트 호출하여 JWT 토큰 받기
+                jwt_tokens = self._get_jwt_tokens_from_yamyam_ops(auth_result["id_token"])
+                
                 # 세션 매니저를 통해 로그인 상태 저장
                 if self.session_manager.save_user_session(
-                    user_data, auth_result["id_token"], auth_result["refresh_token"]
+                    user_data, 
+                    auth_result["id_token"], 
+                    auth_result["refresh_token"],
+                    jwt_access_token=jwt_tokens.get("access_token") if jwt_tokens else None,
+                    jwt_refresh_token=jwt_tokens.get("refresh_token") if jwt_tokens else None,
+                    jwt_expires_in=jwt_tokens.get("expires_in") if jwt_tokens else None,
                 ):
-                    st.success("✅ 로그인되었습니다!")
+                    if jwt_tokens:
+                        st.success("✅ 로그인되었습니다!")
+                    else:
+                        st.warning("⚠️ 로그인되었지만 JWT 토큰 발급에 실패했습니다. 일부 기능이 제한될 수 있습니다.")
                     return user_data
                 else:
                     st.error("❌ 세션 저장에 실패했습니다.")
@@ -170,6 +211,47 @@ class FirebaseAuth:
 
         except Exception as e:
             st.error(f"❌ 로그인 중 오류가 발생했습니다: {str(e)}")
+            return None
+
+    def _get_jwt_tokens_from_yamyam_ops(self, firebase_id_token: str) -> Optional[Dict[str, Any]]:
+        """yamyam-ops의 /login 엔드포인트를 호출하여 JWT 토큰 받기"""
+        try:
+            api_url = st.secrets.get("YAMYAM_OPS_API_URL")
+            if not api_url:
+                logger = get_firebase_logger()
+                logger.log_user_activity(
+                    None, "error", {"message": "YAMYAM_OPS_API_URL이 설정되지 않았습니다."}
+                )
+                return None
+
+            url = f"{api_url.rstrip('/')}/auth/login"
+            payload = {"firebase_token": firebase_id_token}
+            
+            response = requests.post(url, json=payload, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "access_token": data.get("access_token"),
+                    "refresh_token": data.get("refresh_token"),
+                    "token_type": data.get("token_type", "bearer"),
+                    "expires_in": data.get("expires_in"),
+                }
+            else:
+                # 로그인 실패는 경고만 표시 (Firebase 로그인은 성공했으므로)
+                error_msg = response.text
+                logger = get_firebase_logger()
+                logger.log_user_activity(
+                    None, "error", {"message": f"yamyam-ops JWT 토큰 발급 실패: {error_msg}"}
+                )
+                return None
+                
+        except Exception as e:
+            # 예외 발생해도 Firebase 로그인은 성공했으므로 경고만 표시
+            logger = get_firebase_logger()
+            logger.log_user_activity(
+                None, "error", {"message": f"yamyam-ops JWT 토큰 발급 중 오류: {str(e)}"}
+            )
             return None
 
     def _authenticate_user_with_rest_api(

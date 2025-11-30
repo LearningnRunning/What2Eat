@@ -4,14 +4,14 @@
 import pandas as pd
 import streamlit as st
 
-from pages import search_map_page
 from config.constants import LARGE_CATEGORIES, LARGE_CATEGORIES_NOT_USED
+from pages import search_map_page
+from utils.api import APIRequester
 from utils.app import What2EatApp
 from utils.auth import get_current_user
 from utils.dialogs import change_location
 from utils.firebase_logger import get_firebase_logger
 from utils.search_filter import SearchFilter
-from utils.api import APIRequester
 
 
 def _log_user_activity(activity_type: str, detail: dict) -> bool:
@@ -121,6 +121,44 @@ def render_filter_ui(app: What2EatApp, search_filter: SearchFilter):
             step=0.5,
         )
 
+        # 카테고리 선택
+        st.markdown("### 🍽️ 카테고리")
+
+        # 대분류 카테고리 (API에서 가져오기)
+        from utils.category_manager import get_category_manager
+        
+        category_manager = get_category_manager()
+        large_categories_data = category_manager.get_large_categories()
+        large_categories = [cat["name"] for cat in large_categories_data]
+        
+        selected_large = st.multiselect(
+            "대분류 카테고리",
+            options=large_categories,
+            default=st.session_state.search_filters["large_categories"],
+        )
+
+        # 중분류 카테고리 (대분류 선택 시 활성화)
+        middle_categories = []
+        if selected_large:
+            # 선택된 대분류 카테고리별로 중분류 가져오기
+            all_middle = []
+            for large_cat in selected_large:
+                middle_data = category_manager.get_middle_categories(large_cat)
+                all_middle.extend([cat["name"] for cat in middle_data])
+            middle_categories = sorted(list(set(all_middle)))  # 중복 제거
+
+            selected_middle = st.multiselect(
+                "중분류 카테고리",
+                options=middle_categories,
+                default=[
+                    cat
+                    for cat in st.session_state.search_filters["middle_categories"]
+                    if cat in middle_categories
+                ],
+            )
+        else:
+            selected_middle = []
+
         # 정렬 기준
         st.markdown("### 📊 정렬 기준")
         sort_by = st.radio(
@@ -150,6 +188,24 @@ def render_filter_ui(app: What2EatApp, search_filter: SearchFilter):
             st.session_state.search_filters["middle_categories"] = selected_middle
             st.session_state.search_filters["sort_by"] = sort_by
             st.session_state.search_filters["period"] = period
+
+            # 활동 로그 기록
+            try:
+                from utils.activity_logger import get_activity_logger
+
+                logger = get_activity_logger()
+                logger.log_filter_change(
+                    radius=radius_km,
+                    large_categories=selected_large,
+                    middle_categories=selected_middle,
+                    sort_by=sort_by,
+                    period=period,
+                    page="search_filter",
+                )
+            except Exception as e:
+                # 로깅 실패해도 계속 진행
+                pass
+
             return True
 
     return False
@@ -167,37 +223,46 @@ def render_restaurant_dataframe(df_results):
     display_count = st.session_state.search_display_count
     df_display = df_results.head(display_count).copy()
     df_display["카테고리"] = df_display["diner_category_middle"].fillna(df_display["diner_category_large"])
-    # DataFrame 표시용 데이터 준비
-    # 음식점명을 마크다운 링크 형식으로 변환
-    display_data = {
-        "링크": [f"https://place.map.kakao.com/{x}" for x in df_display["diner_idx"].tolist()],
-        "음식점명": df_display["diner_name"].tolist(),
-        "카테고리": df_display["카테고리"].tolist(),
-        "평점": df_display["diner_review_avg"].tolist(),
-        "리뷰수": df_display["diner_review_cnt"].fillna(0).astype(int).tolist(),
-        "거리(km)": df_display["distance"].round(1).tolist() if "distance" in df_display.columns else [0] * len(df_display),
-    }
-
-    if "personalized_score" in df_display.columns:
-        display_data["개인화 점수"] = df_display["personalized_score"].tolist()
-
-    df_to_display = pd.DataFrame(display_data)
-
-    # DataFrame 표시 with column configuration
-    st.dataframe(
-        df_to_display,
-        column_config={
-            "음식점명": st.column_config.TextColumn("음식점명", width="medium"),
-            "링크": st.column_config.LinkColumn("링크", width="small", display_text="🔗"),
-            "카테고리": st.column_config.TextColumn("카테고리", width="small"),
-            "평점": st.column_config.TextColumn("평점", width="small"),
-            "리뷰수": st.column_config.NumberColumn("리뷰수", width="small"),
-            "거리(km)": st.column_config.NumberColumn("거리(km)", width="small", format="%.1f"),
-        },
-        hide_index=True,
-        use_container_width=True,
-        height=600,
-    )
+    
+    # 각 음식점을 개별 행으로 렌더링하여 클릭 감지 가능하게 만들기
+    from utils.activity_logger import get_activity_logger
+    
+    for list_idx, (df_idx, row) in enumerate(df_display.iterrows()):
+        diner_idx = row["diner_idx"]
+        diner_name = row["diner_name"]
+        diner_url = f"https://place.map.kakao.com/{diner_idx}"
+        
+        col1, col2, col3, col4, col5, col6 = st.columns([3, 2, 1, 1, 1, 1])
+        
+        with col1:
+            st.write(f"**{diner_name}**")
+        with col2:
+            st.write(row["카테고리"])
+        with col3:
+            st.write("⭐" * int(row["diner_grade"]) if pd.notna(row["diner_grade"]) and row["diner_grade"] else "")
+        with col4:
+            st.write(int(row["diner_review_cnt"]) if pd.notna(row["diner_review_cnt"]) else 0)
+        with col5:
+            if "distance" in row and pd.notna(row["distance"]):
+                st.write(f"{row['distance']:.1f}km")
+            else:
+                st.write("-")
+        with col6:
+            # 직접 링크도 제공 (백업)
+            st.link_button("보기", diner_url)
+            try:
+                logger = get_activity_logger()
+                logger.log_diner_click(
+                    diner_idx=str(diner_idx),
+                    diner_name=diner_name,
+                        position=list_idx + 1,
+                        page="search_filter",
+                    )
+            except Exception as e:
+                # 로깅 실패해도 계속 진행
+                pass
+        if list_idx < len(df_display) - 1:
+            st.divider()
 
     # 더보기 버튼
     if len(df_results) > display_count:

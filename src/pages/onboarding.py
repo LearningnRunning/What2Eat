@@ -64,31 +64,19 @@ class OnboardingPage:
         return False
 
     def _initialize_search_engine(self):
-        """검색 엔진을 초기화합니다."""
+        """검색 엔진을 초기화합니다. (API 기반으로 변경됨, 레거시 호환성 유지)"""
         if st.session_state.search_engine is None:
             try:
+                # 검색 엔진은 이제 API 기반으로 동작하므로 빈 DataFrame으로 초기화
                 import pandas as pd
 
-                # 기본 데이터 로드 (diner_idx, diner_name, distance 포함)
-                data_file = "data/seoul_data/whatToEat_DB_seoul_diner_20250301_plus_review_cnt.csv"
-                df = pd.read_csv(data_file)
+                # 최소한의 구조만 유지 (실제 데이터는 API에서 가져옴)
+                basic_df = pd.DataFrame(columns=["diner_idx", "diner_name", "distance"])
 
-                if "diner_idx" in df.columns and "diner_name" in df.columns:
-                    # 거리 정보가 있으면 포함, 없으면 기본 정보만
-                    if "distance" in df.columns:
-                        basic_df = df[["diner_idx", "diner_name", "distance"]].dropna(
-                            subset=["diner_idx", "diner_name"]
-                        )
-                    else:
-                        basic_df = df[["diner_idx", "diner_name"]].dropna()
-
-                    search_engine = DinerSearchEngine()
-                    search_engine.load_basic_data(basic_df)
-                    st.session_state.search_engine = search_engine
-                    return True
-                else:
-                    st.error("❌ 데이터 파일에 필요한 컬럼이 없습니다.")
-                    return False
+                search_engine = DinerSearchEngine()
+                search_engine.load_basic_data(basic_df)
+                st.session_state.search_engine = search_engine
+                return True
             except Exception as e:
                 st.error(f"❌ 검색 엔진 초기화 실패: {str(e)}")
                 return False
@@ -107,7 +95,7 @@ class OnboardingPage:
         # 검색 입력
         query = st.text_input(
             "🔍 음식점 이름을 입력하세요",
-            placeholder="예: 맛있는집, 스시로, 피자헛, 강남 맛집...",
+            placeholder="예: 남춘천닭갈비, 스시로, 피자헛, 떡볶이...",
             help="정확한 매칭, 부분 매칭, 자모 매칭을 지원합니다.",
             key="onboarding_search_input",
         )
@@ -182,6 +170,7 @@ class OnboardingPage:
             st.error("streamlit_geolocation 패키지가 설치되지 않았습니다.")
             return
 
+        from utils.activity_logger import get_activity_logger
         from utils.geolocation import geocode, save_user_location
 
         with st.spinner("📍 현재 위치를 찾는 중입니다..."):
@@ -205,6 +194,20 @@ class OnboardingPage:
                 # 온보딩 프로필에 저장
                 self._save_location_to_profile(st.session_state.address, "geolocation")
 
+                # 활동 로그 기록
+                try:
+                    logger = get_activity_logger()
+                    logger.log_location_set(
+                        address=st.session_state.address,
+                        lat=st.session_state.user_lat,
+                        lon=st.session_state.user_lon,
+                        method="geolocation",
+                        page="onboarding",
+                    )
+                except Exception as e:
+                    # 로깅 실패해도 계속 진행
+                    pass
+
                 st.success("✅ 위치를 찾았습니다!")
             else:
                 st.error("위 버튼을 눌러 현위치를 확인해보세요.")
@@ -214,6 +217,7 @@ class OnboardingPage:
         import requests
 
         from config.constants import KAKAO_API_HEADERS, KAKAO_API_URL
+        from utils.activity_logger import get_activity_logger
         from utils.geolocation import save_user_location
 
         params = {"query": search_text, "size": 1}
@@ -237,6 +241,24 @@ class OnboardingPage:
 
                 # 온보딩 프로필에 저장
                 self._save_location_to_profile(address, "search")
+
+                # 활동 로그 기록
+                try:
+                    logger = get_activity_logger()
+                    logger.log_location_search(
+                        query=search_text,
+                        lat=lat,
+                        lon=lon,
+                        address=address,
+                        method="search",
+                        page="onboarding",
+                    )
+                    logger.log_location_set(
+                        address=address, lat=lat, lon=lon, method="search", page="onboarding"
+                    )
+                except Exception as e:
+                    # 로깅 실패해도 계속 진행
+                    pass
 
                 st.success(f"✅ 위치를 찾았습니다: {address}")
                 st.rerun()
@@ -964,6 +986,38 @@ class OnboardingPage:
 
                 # 온보딩 완료 로그 기록
                 self._log_onboarding_completion()
+
+                # PostgreSQL에 온보딩 데이터 저장
+                try:
+                    import asyncio
+
+                    from utils.api_client import get_yamyam_ops_client
+
+                    client = get_yamyam_ops_client()
+                    if client:
+                        # 비동기 함수를 동기적으로 실행
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        success = loop.run_until_complete(
+                            client.save_onboarding_data(
+                                st.session_state.user_profile,
+                                st.session_state.restaurant_ratings,
+                            )
+                        )
+                        loop.close()
+
+                        if success:
+                            st.success("✅ 온보딩 데이터가 PostgreSQL에 저장되었습니다.")
+                        else:
+                            st.warning(
+                                "⚠️ 온보딩 데이터 저장에 실패했습니다. Firestore에는 저장되었습니다."
+                            )
+                    else:
+                        st.warning("⚠️ API 클라이언트를 초기화할 수 없습니다.")
+                except Exception as sync_error:
+                    # 동기화 실패해도 Firestore에는 저장되었으므로 계속 진행
+                    st.warning(f"⚠️ PostgreSQL 저장 중 오류: {str(sync_error)}")
+                    st.info("Firestore에는 정상적으로 저장되었습니다.")
 
                 # # 추천 미리보기 표시
                 # st.markdown("### 🎯 당신을 위한 추천 미리보기")

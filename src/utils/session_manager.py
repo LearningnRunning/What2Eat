@@ -30,15 +30,27 @@ class SessionManager:
             st.session_state.token_expires_at = None
         if "refresh_token" not in st.session_state:
             st.session_state.refresh_token = None
+        if "jwt_access_token" not in st.session_state:
+            st.session_state.jwt_access_token = None
+        if "jwt_refresh_token" not in st.session_state:
+            st.session_state.jwt_refresh_token = None
+        if "jwt_expires_at" not in st.session_state:
+            st.session_state.jwt_expires_at = None
         if "cookie_set_counter" not in st.session_state:
             st.session_state.cookie_set_counter = 0
 
     def save_user_session(
-        self, user_data: Dict[str, Any], id_token: str, refresh_token: str = None
+        self, 
+        user_data: Dict[str, Any], 
+        id_token: str, 
+        refresh_token: str = None,
+        jwt_access_token: str = None,
+        jwt_refresh_token: str = None,
+        jwt_expires_in: int = None,
     ):
         """사용자 세션 정보 저장"""
         try:
-            # 토큰 만료 시간 설정 (1시간)
+            # Firebase 토큰 만료 시간 설정 (1시간)
             expires_at = datetime.now() + timedelta(hours=1)
 
             # 세션 상태에 저장
@@ -47,6 +59,15 @@ class SessionManager:
             st.session_state.auth_token = id_token
             st.session_state.token_expires_at = expires_at
             st.session_state.refresh_token = refresh_token
+            
+            # JWT 토큰 저장
+            if jwt_access_token:
+                st.session_state.jwt_access_token = jwt_access_token
+            if jwt_refresh_token:
+                st.session_state.jwt_refresh_token = jwt_refresh_token
+            if jwt_expires_in:
+                # JWT 만료 시간 설정 (expires_in은 초 단위)
+                st.session_state.jwt_expires_at = datetime.now() + timedelta(seconds=jwt_expires_in)
 
             # 쿠키에도 저장 (새로고침 시 세션 복원용)
             try:
@@ -250,6 +271,9 @@ class SessionManager:
             st.session_state.auth_token = None
             st.session_state.token_expires_at = None
             st.session_state.refresh_token = None
+            st.session_state.jwt_access_token = None
+            st.session_state.jwt_refresh_token = None
+            st.session_state.jwt_expires_at = None
 
         except Exception as e:
             st.warning(f"세션 삭제 중 오류: {str(e)}")
