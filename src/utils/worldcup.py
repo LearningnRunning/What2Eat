@@ -11,9 +11,9 @@ import requests
 class WorldCupManager:
     """맛집 월드컵 관리 클래스"""
     
-    def __init__(self, df_diner: pd.DataFrame, redis_api_url: str = st.secrets["REDIS_API_URL"]):
+    def __init__(self, df_diner: pd.DataFrame, api_url: str = st.secrets.get("API_URL")):
         self.df_diner = df_diner
-        self.redis_api_url = redis_api_url
+        self.api_url = api_url
         self.category_icons = {
             "카페": "☕",
             "일식": "🍜",
@@ -27,7 +27,7 @@ class WorldCupManager:
         """Redis에서 유사 식당 ID 리스트 가져오기"""
         try:
             response = requests.post(
-                self.redis_api_url,
+                self.api_url,
                 json={"keys": [f"diner:{diner_idx}:similar_diner_ids"]},
                 timeout=3
             )
