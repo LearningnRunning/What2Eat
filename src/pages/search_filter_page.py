@@ -7,9 +7,11 @@ import streamlit as st
 from pages import search_map_page
 from config.constants import LARGE_CATEGORIES, LARGE_CATEGORIES_NOT_USED
 from utils.app import What2EatApp
+from utils.auth import get_current_user
 from utils.dialogs import change_location
 from utils.firebase_logger import get_firebase_logger
 from utils.search_filter import SearchFilter
+from utils.api import APIRequester
 
 
 def _log_user_activity(activity_type: str, detail: dict) -> bool:
@@ -179,6 +181,9 @@ def render_restaurant_dataframe(df_results):
         "거리(km)": df_display["distance"].round(1).tolist() if "distance" in df_display.columns else [0] * len(df_display),
     }
 
+    if "personalized_score" in df_display.columns:
+        display_data["개인화 점수"] = df_display["personalized_score"].tolist()
+
     df_to_display = pd.DataFrame(display_data)
 
     # DataFrame 표시 with column configuration
@@ -260,6 +265,44 @@ def render():
                 period=filters["period"],
             )
 
+            if filters["sort_by"] == "개인화":
+                diner_ids = df_results["diner_idx"].tolist()
+                firebase_uid = get_current_user()["localId"]
+                
+                try:
+                    # Call personal recommendation API
+                    api = APIRequester(endpoint=st.secrets["API_URL"])
+                    response = api.post("/rec/personal", data={
+                        "diner_ids": diner_ids,
+                        "firebase_uid": firebase_uid
+                    }).json()
+                    
+                    personalized_diner_ids = response["diner_ids"]
+                    personalized_scores = response["scores"]
+                    
+                    # Handle case where response has fewer items than original
+                    if len(personalized_diner_ids) < len(diner_ids):
+                        # Get remaining diner_ids not in personalized response
+                        # These diners are **cold-start** diners, not in train data
+                        remaining_ids = [id for id in diner_ids if id not in personalized_diner_ids]
+                        # Combine personalized + remaining in original order
+                        final_diner_ids = personalized_diner_ids + remaining_ids
+                        scores = personalized_scores + ["NA"]*len(remaining_ids)
+                    else:
+                        final_diner_ids = personalized_diner_ids.copy()
+                        scores = personalized_scores.copy()
+                    
+                    # Reorder df_results based on personalized order
+                    df_results = df_results.set_index("diner_idx").reindex(final_diner_ids).reset_index()
+                    df_results["personalized_score"] = scores
+                    
+                except Exception as e:
+                    st.warning(f"개인화 추천을 불러오는데 실패했습니다. 기본 정렬을 사용합니다: {e}")
+                    # Keep original df_results ordering as fallback
+            else:
+                # todo: 윤선님, 성록님 개발 내용
+                pass
+
             # 결과 저장
             st.session_state.search_results = df_results
             # 표시 개수 초기화
@@ -292,4 +335,3 @@ def render():
         render_restaurant_dataframe(df_results)
     else:
         st.info("👆 위에서 필터를 설정하고 검색해보세요!")
-
