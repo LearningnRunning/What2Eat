@@ -756,7 +756,9 @@ class OnboardingPage:
                         )
                         similar_restaurants = (
                             self.onboarding_manager.get_similar_restaurants(
-                                restaurant["id"]
+                                restaurant["id"],
+                                limit=3,
+                                use_item_cf=True
                             )
                         )
 
