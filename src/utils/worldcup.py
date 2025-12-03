@@ -11,7 +11,7 @@ import requests
 class WorldCupManager:
     """맛집 월드컵 관리 클래스"""
     
-    def __init__(self, df_diner: pd.DataFrame, api_url: str = st.secrets["API_URL"]):
+    def __init__(self, df_diner: pd.DataFrame, api_url: str = st.secrets.get("API_URL")):
         self.df_diner = df_diner
         self.api_url = api_url
         self.category_icons = {
