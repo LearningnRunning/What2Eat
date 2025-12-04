@@ -870,34 +870,6 @@ class OnboardingPage:
             st.session_state.total_rated_count = current_total
 
         if st.session_state.total_rated_count >= self.min_ratings_required:
-            # get most similar kakao_reviewer_id using /rec/user/similar
-            request_body = {
-                "liked_diner_ids": [int(diner_id.split("_")[-1]) for diner_id in st.session_state.restaurant_ratings.keys()],
-                "scores_of_liked_diner_ids": [score for score in st.session_state.restaurant_ratings.values()],
-            }
-            response = self.api_requester.post(
-                api_path="/rec/user/similar",
-                data=request_body,
-            ).json()
-
-            # update matched kakao_reviewer_id into db
-            kakao_reviewer_id = response["reviewer_id"]
-            firebase_uid = get_current_user()["localId"]
-            self.api_requester.put(
-                api_path=f"/users/{firebase_uid}",
-                # parameters should be reduced to include `kakao_reviewer_id` only
-                data={
-                    "name": "string",
-                    "email": "string",
-                    "display_name": "string",
-                    "photo_url": "string",
-                    "kakao_reviewer_id": str(kakao_reviewer_id)
-                },
-                params={
-                    "user_id_type": "firebase_uid"
-                }
-            )
-
             st.success(
                 f"✅ {st.session_state.total_rated_count}개 음식점 평가 완료! 다음 단계로 진행할 수 있습니다."
             )
@@ -917,6 +889,34 @@ class OnboardingPage:
         )
 
     def _render_completion_step(self):
+        # get most similar kakao_reviewer_id using /rec/user/similar
+        request_body = {
+            "liked_diner_ids": [int(diner_id.split("_")[-1]) for diner_id in st.session_state.restaurant_ratings.keys()],
+            "scores_of_liked_diner_ids": [score for score in st.session_state.restaurant_ratings.values()],
+        }
+        response = self.api_requester.post(
+            api_path="/rec/user/similar",
+            data=request_body,
+        ).json()
+
+        # update matched kakao_reviewer_id into db
+        kakao_reviewer_id = response["reviewer_id"]
+        firebase_uid = get_current_user()["localId"]
+        self.api_requester.put(
+            api_path=f"/users/{firebase_uid}",
+            # parameters should be reduced to include `kakao_reviewer_id` only
+            data={
+                "name": "string",
+                "email": "string",
+                "display_name": "string",
+                "photo_url": "string",
+                "kakao_reviewer_id": str(kakao_reviewer_id)
+            },
+            params={
+                "user_id_type": "firebase_uid"
+            }
+        )
+
         """완료 단계"""
         st.markdown("# 🎉 설정이 완료되었습니다!")
 
