@@ -14,7 +14,7 @@ class SearchFilter:
     """검색 필터링을 담당하는 클래스"""
 
     def __init__(self, df_diner: pd.DataFrame):
-        self.df_diner = df_diner
+        self.df_diner = self.preprocess(df_diner)
 
     def filter_by_location(
         self, user_lat: float, user_lon: float, radius_km: float = 5.0
@@ -88,14 +88,14 @@ class SearchFilter:
                 by=["diner_grade", "diner_review_cnt"], ascending=[False, False]
             )
         elif sort_by == "평점":
-            # 평점 기준
+            # 리뷰 평점 기준
             df_sorted = df_sorted.sort_values(
-                by=["diner_grade", "bayesian_score"], ascending=[False, False]
+                by=["diner_review_avg", "diner_review_cnt"], ascending=[False, False]
             )
         elif sort_by == "리뷰":
             # 리뷰 개수 기준
             df_sorted = df_sorted.sort_values(
-                by=["diner_review_cnt", "diner_grade"], ascending=[False, False]
+                by=["diner_review_cnt", "diner_review_avg"], ascending=[False, False]
             )
         elif sort_by == "거리순":
             # 거리 기준
@@ -133,3 +133,17 @@ class SearchFilter:
 
         return df_filtered
 
+    def preprocess(self, df_diner: pd.DataFrame):
+        # diner_review_cnt 전처리
+        df_diner["diner_review_cnt"] = df_diner["diner_review_cnt"].map(
+            lambda x: self.convert_type(x)
+        )
+        return df_diner
+
+    @staticmethod
+    def convert_type(val):
+        try:
+            return int(val)
+        except Exception:
+            # if the convertion of integer fails, it means `아직 등록된 리뷰가 없습니다.`
+            return 0

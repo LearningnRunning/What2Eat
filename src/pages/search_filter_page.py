@@ -174,7 +174,7 @@ def render_restaurant_dataframe(df_results):
         "링크": [f"https://place.map.kakao.com/{x}" for x in df_display["diner_idx"].tolist()],
         "음식점명": df_display["diner_name"].tolist(),
         "카테고리": df_display["카테고리"].tolist(),
-        "등급": df_display["diner_grade"].apply(lambda x: "⭐" * int(x) if x else "").tolist(),
+        "평점": df_display["diner_review_avg"].tolist(),
         "리뷰수": df_display["diner_review_cnt"].fillna(0).astype(int).tolist(),
         "거리(km)": df_display["distance"].round(1).tolist() if "distance" in df_display.columns else [0] * len(df_display),
     }
@@ -188,7 +188,7 @@ def render_restaurant_dataframe(df_results):
             "음식점명": st.column_config.TextColumn("음식점명", width="medium"),
             "링크": st.column_config.LinkColumn("링크", width="small", display_text="🔗"),
             "카테고리": st.column_config.TextColumn("카테고리", width="small"),
-            "등급": st.column_config.TextColumn("등급", width="small"),
+            "평점": st.column_config.TextColumn("평점", width="small"),
             "리뷰수": st.column_config.NumberColumn("리뷰수", width="small"),
             "거리(km)": st.column_config.NumberColumn("거리(km)", width="small", format="%.1f"),
         },
