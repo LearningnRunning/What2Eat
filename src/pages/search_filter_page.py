@@ -124,9 +124,6 @@ def render_filter_ui(app: What2EatApp, search_filter: SearchFilter):
         sort_by = st.radio(
             "정렬 방식",
             options=["개인화", "숨찐맛", "평점", "리뷰", "거리순"],
-            index=["개인화", "숨찐맛", "평점", "리뷰", "거리순"].index(
-                st.session_state.search_filters["sort_by"]
-            ),
             horizontal=True,
         )
 
