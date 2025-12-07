@@ -54,15 +54,13 @@ class SimilarRestaurantFetcher:
         try:
             # Redis에서 유사 식당 ID 리스트 가져오기
             key = f"diner:{diner_idx}:similar_diner_ids"
-            response = requests.post(self.api_url, json={"keys": [key]}, timeout=3)
-            
+            response = requests.post(self.api_url + "/api/v1/redis/read", json={"keys": [key]}, timeout=3)
             if response.status_code != 200:
                 return []
             
-            similar_ids = response.json().get(key, [])
+            similar_ids = response.json().get("data", {}).get(key, [])
             if not similar_ids or not isinstance(similar_ids, list):
                 return []
-            
             # 각 ID에 대해 상세 정보 가져오기
             restaurants = []
             for kakao_place_id in similar_ids[:limit]:
@@ -84,9 +82,8 @@ class SimilarRestaurantFetcher:
     ) -> Optional[Dict[str, Any]]:
         """API로부터 개별 식당 정보 가져오기"""
         try:
-            url = f"{self.api_url}/kakao-diners/{kakao_place_id}"
+            url = f"{self.api_url}/kakao/diners/{kakao_place_id}"
             response = requests.get(url, timeout=3)
-            
             if response.status_code == 200:
                 api_data = response.json()
                 return self._convert_api_response_to_dict(api_data, user_lat, user_lon)
@@ -107,16 +104,13 @@ class SimilarRestaurantFetcher:
         # 메뉴 파싱
         menu_names = api_data.get("diner_menu_name", "")
         specialties = [m.strip() for m in menu_names.split(",")][:2] if menu_names else []
-        
         # 평점
         rating = float(api_data.get("diner_review_avg", 0) or 0)
-        
         # 리뷰 수
         try:
             review_count = int(api_data.get("diner_review_cnt") or 0)
         except (ValueError, TypeError):
             review_count = 0
-        
         # 거리 계산
         distance = 0.0
         if user_lat and user_lon:
@@ -127,11 +121,10 @@ class SimilarRestaurantFetcher:
                     distance = round(haversine(user_lat, user_lon, diner_lat, diner_lon), 1)
                 except Exception:
                     distance = 0.0
-        
         return {
             "id": str(api_data.get("diner_idx", "")),
             "name": api_data.get("diner_name", ""),
-            "category": api_data.get("diner_category_large", ""),
+            "category": api_data.get("diner_category_large", "카테고리 정보 없음"),
             "rating": rating,
             "specialties": specialties,
             "distance": distance,

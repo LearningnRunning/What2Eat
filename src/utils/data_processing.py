@@ -37,7 +37,7 @@ def safe_item_access(item, index=None):
     return str(item)
 
 
-@st.cache_data
+@st.cache_data(hash_funcs={pd.DataFrame: lambda _: None})
 def get_filtered_data(df, user_lat, user_lon, max_radius=30):
     df["distance"] = df.apply(
         lambda row: haversine(user_lat, user_lon, row["diner_lat"], row["diner_lon"]),
@@ -49,7 +49,7 @@ def get_filtered_data(df, user_lat, user_lon, max_radius=30):
     return filtered_df
 
 
-@st.cache_data
+@st.cache_data(hash_funcs={pd.DataFrame: lambda _: None})
 def category_filters(diner_category, df_diner_real_review):
     category_filted_df = df_diner_real_review.query(
         "diner_category_large in @diner_category"
@@ -180,7 +180,7 @@ def recommend_items_model(user_id, algo, trainset, num_recommendations=5):
 
 
 # 랜덤 뽑기 함수
-@st.cache_data
+@st.cache_data(hash_funcs={pd.DataFrame: lambda _: None})
 def pick_random_diners(df, num_to_select=25):
     high_grade_diners = df[df["diner_grade"] >= 2]
     # 조건: 이미 선택된 카테고리는 제외

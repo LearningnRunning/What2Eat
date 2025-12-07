@@ -46,7 +46,7 @@ def safe_string_to_list(input_string, column_name):
         return []
 
 
-@st.cache_data
+@st.cache_data(hash_funcs={pd.DataFrame: lambda _: None})
 def load_static_data(logo_img_path, logo_small_img_path, guide_image_path):
     """
     분리된 CSV 파일들을 로드하고 병합하여 완전한 데이터프레임을 생성합니다.
