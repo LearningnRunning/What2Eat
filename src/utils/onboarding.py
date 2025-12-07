@@ -21,7 +21,7 @@ class OnboardingManager:
         self.app = app
         # 유사 식당 fetcher 초기화
         if app and hasattr(app, "df_diner"):
-            self.similar_fetcher = get_similar_restaurant_fetcher(app.df_diner)
+            self.similar_fetcher = get_similar_restaurant_fetcher()
         else:
             self.similar_fetcher = None
 

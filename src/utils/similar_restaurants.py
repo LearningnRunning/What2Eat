@@ -10,8 +10,7 @@ from utils.data_processing import haversine
 class SimilarRestaurantFetcher:
     """유사 식당 조회를 위한 공유 클래스"""
     
-    def __init__(self, df_diner: pd.DataFrame, api_url: Optional[str] = None):
-        self.df_diner = df_diner
+    def __init__(self, api_url: Optional[str] = None):
         self.api_url = api_url or st.secrets.get("API_URL", "")
     
     def get_similar_restaurants(
@@ -179,6 +178,6 @@ class SimilarRestaurantFetcher:
         }
 
 
-def get_similar_restaurant_fetcher(df_diner: pd.DataFrame) -> SimilarRestaurantFetcher:
+def get_similar_restaurant_fetcher() -> SimilarRestaurantFetcher:
     """SimilarRestaurantFetcher 인스턴스 반환"""
-    return SimilarRestaurantFetcher(df_diner)
+    return SimilarRestaurantFetcher()
