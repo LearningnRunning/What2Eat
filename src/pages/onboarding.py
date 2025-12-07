@@ -904,12 +904,7 @@ class OnboardingPage:
         firebase_uid = get_current_user()["localId"]
         self.api_requester.put(
             api_path=f"/users/{firebase_uid}",
-            # parameters should be reduced to include `kakao_reviewer_id` only
             data={
-                "name": "string",
-                "email": "string",
-                "display_name": "string",
-                "photo_url": "string",
                 "kakao_reviewer_id": str(kakao_reviewer_id)
             },
             params={
