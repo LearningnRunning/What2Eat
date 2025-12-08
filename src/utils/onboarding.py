@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 from firebase_admin import firestore
 
+from utils.api import APIRequester
 from utils.auth import get_current_user
 from utils.data_processing import get_filtered_data
 from utils.firebase_logger import get_firebase_logger
@@ -18,6 +19,7 @@ class OnboardingManager:
     def __init__(self, app=None):
         self.logger = get_firebase_logger()
         self.app = app
+        self.api_requester = APIRequester(endpoint=st.secrets["API_URL"])
 
     def get_popular_restaurants_by_location(
         self, location: str, limit: int = 10
@@ -535,7 +537,7 @@ class OnboardingManager:
         errors = []
 
         # 필수 프로필 정보 확인
-        required_fields = ["location", "birth_year", "gender", "regular_budget"]
+        required_fields = ["location"]
         for field in required_fields:
             if not profile_data.get(field):
                 errors.append(f"{field} 정보가 누락되었습니다.")
@@ -547,16 +549,8 @@ class OnboardingManager:
 
         # 평가 개수 확인
         rated_count = len([r for r in ratings_data.values() if r > 0])
-        if rated_count < 3:  # 최소 3개 평가 필요
-            errors.append(f"최소 3개 음식점 평가가 필요합니다. (현재: {rated_count}개)")
-
-        # 연령 유효성 확인
-        birth_year = profile_data.get("birth_year")
-        if birth_year:
-            current_year = datetime.now().year
-            age = current_year - birth_year
-            if age < 10 or age > 100:
-                errors.append("올바른 출생연도를 입력해주세요.")
+        if rated_count < 5:  # 최소 5개 평가 필요
+            errors.append(f"최소 5개 음식점 평가가 필요합니다. (현재: {rated_count}개)")
 
         return errors
 
