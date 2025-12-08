@@ -32,5 +32,5 @@ def render():
     app = st.session_state.app
 
     # WorldCupManager 사용 (Redis 통합 버전)
-    worldcup_manager = get_worldcup_manager(app.df_diner)
+    worldcup_manager = get_worldcup_manager()
     worldcup_manager.render_worldcup_page()

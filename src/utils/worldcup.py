@@ -26,11 +26,10 @@ class WorldCupManager:
         """API에서 랜덤 식당 가져오기"""
         try:
             response = requests.get(
-                f"{self.api_url}/kakao/diners",
+                f"{self.api_url}/kakao/diners/filtered",
                 params={"n": n},
-                timeout=5
+                timeout=20
             )
-            
             if response.status_code == 200:
                 diners = response.json()
                 # API response가 리스트 형태인지 확인
