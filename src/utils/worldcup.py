@@ -6,6 +6,48 @@ from typing import List, Dict, Optional, Any
 from collections import Counter
 import streamlit as st
 import requests
+import google.generativeai as genai
+
+
+def analyze_user_preference(selected_diners: List[Dict[str, Any]]) -> str:
+    """LLM(Gemini)로 유저 맛집 취향 분석"""
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+
+        # LLM에게 넘길 식당 정보 요약 만들기
+        formatted = []
+        for d in selected_diners:
+            formatted.append({
+                "name": d.get("diner_name"),
+                "category_large": d.get("diner_category_large"),
+                "category_middle": d.get("diner_category_middle"),
+                "rating": d.get("rating"),
+                "review_count": d.get("review_cnt"),
+                "address": d.get("address"),
+            })
+
+        prompt = f"""
+        아래는 사용자가 맛집 월드컵에서 선택한 식당 정보 목록입니다.
+        이 식당들의 특징을 분석해 '맛집 취향 분석 리포트'를 작성해주세요.
+
+        - 카테고리 성향 분석
+        - 양식/한식/일식 등 선호도 분석
+        - 맛/분위기/가격대 특성 요약
+        - 사용자가 어떤 포인트를 중요하게 보는지 (예: 리뷰 많은 곳, 평점 높은 곳)
+        - 전반적인 맛집 성향 요약 (3~5줄)
+
+        식당 목록:
+        {formatted}
+
+        결과는 한국어로, 친절한 추천/분석 형태로 작성해주세요.
+        """
+        
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content(prompt)
+        return response.text
+
+    except Exception as e:
+        return f"LLM 분석 실패: {e}"
 
 
 class WorldCupManager:
@@ -77,10 +119,10 @@ class WorldCupManager:
         
         return []
     
-    def build_tournament_candidates(self, selected_diner: Dict[str, Any], other_diner: Dict[str, Any], size: int = 8) -> List[Dict[str, Any]]:
-        """토너먼트 후보 생성 (유저가 선택한 식당 + 유사 식당 6개 + 선택 안한 식당 1개)"""
+    def build_tournament_candidates(self, selected_diner: Dict[str, Any], size: int = 8) -> List[Dict[str, Any]]:
+        """토너먼트 후보 생성 (유저가 선택한 식당 + 유사 식당 7개)"""
         # 1단계: 선택한 식당을 첫 번째 후보로 추가
-        all_candidates = [selected_diner, other_diner]
+        all_candidates = [selected_diner]
         
         # 2단계: 선택한 식당의 유사 식당 ID 가져오기
         selected_diner_idx = selected_diner.get("diner_idx")
@@ -88,10 +130,10 @@ class WorldCupManager:
         
         # 3단계: 유사 식당 정보 가져오기
         similar_restaurants = []
-        needed = size - 2  # 이미 2개(선택한 식당 + 선택 안한 식당)가 있으므로 6개 필요
+        needed = size - 1  # 선택한 식당 제외 필요 개수
         
         if similar_ids:
-            existing_ids = {selected_diner["diner_idx"], other_diner["diner_idx"]}
+            existing_ids = {selected_diner["diner_idx"]}
             for sim_id in similar_ids:
                 if len(similar_restaurants) >= needed:
                     break
@@ -190,10 +232,9 @@ class WorldCupManager:
     def start_tournament_with_selection(self, selected_idx: int):
         """선택된 식당으로 토너먼트 시작"""
         selected_diner = st.session_state.initial_diners[selected_idx]
-        other_diner = st.session_state.initial_diners[1 - selected_idx]
         
         # 토너먼트 후보 생성 (선택한 식당 기반 유사 식당 포함)
-        candidates = self.build_tournament_candidates(selected_diner, other_diner, size=8)
+        candidates = self.build_tournament_candidates(selected_diner, size=8)
         
         if not candidates or len(candidates) < 8:
             st.error(f"토너먼트를 시작하기에 충분한 식당(8개)을 불러오지 못했습니다.")
@@ -368,6 +409,23 @@ class WorldCupManager:
                     """,
                     unsafe_allow_html=True
                 )
+
+        # --- LLM 취향 분석 ---
+        st.markdown("### 🤖 AI 맛집 취향 분석 결과")
+
+        with st.spinner("AI가 맛집 취향을 분석 중입니다..."):
+            result = analyze_user_preference(selected_diners)
+
+        st.markdown(
+            f"""
+            <div style='padding:15px; background-color:#f7f9fc; border-radius:10px;
+                        border-left:5px solid #1f77b4; margin-top:10px;'>
+                {result}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
     
     def render_restaurant_card(self, restaurant: Dict[str, Any], idx: int):
         """식당 카드 렌더링"""
