@@ -5,7 +5,7 @@ ML 추천 모델 학습을 위한 사용자 행동 데이터 수집
 
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 import streamlit as st
 
@@ -65,7 +65,9 @@ class ActivityLogger:
         try:
             firebase_uid = self._get_firebase_uid()
             if not firebase_uid:
-                logger.warning("Firebase UID를 찾을 수 없습니다. 로그를 전송하지 않습니다.")
+                logger.warning(
+                    "Firebase UID를 찾을 수 없습니다. 로그를 전송하지 않습니다."
+                )
                 return False
 
             client = self._get_api_client()
@@ -83,7 +85,7 @@ class ActivityLogger:
 
             # API 호출
             result = await client._make_request(
-                "POST", "/activity-logs", data=log_data
+                "POST", "/activity-logs/", data=log_data
             )
 
             if result:
@@ -157,11 +159,15 @@ class ActivityLogger:
 
     def log_filter_change(
         self,
+        address: str,
+        lat: float,
+        lon: float,
         radius: Optional[float] = None,
-        large_categories: Optional[List[str]] = None,
-        middle_categories: Optional[List[str]] = None,
+        large_categories: Optional[list[str]] = None,
+        middle_categories: Optional[list[str]] = None,
         sort_by: Optional[str] = None,
         period: Optional[str] = None,
+        location_method: Optional[str] = None,
         page: str = "search_filter",
     ):
         """검색 필터 변경 로그"""
@@ -174,6 +180,10 @@ class ActivityLogger:
                 self._log_event(
                     event_type="filter_change",
                     page=page,
+                    location_address=address,
+                    location_lat=lat,
+                    location_lon=lon,
+                    location_method=location_method,
                     search_radius_km=radius,
                     selected_large_categories=large_categories,
                     selected_middle_categories=middle_categories,
@@ -205,8 +215,8 @@ class ActivityLogger:
 
     def log_category_select(
         self,
-        large_categories: Optional[List[str]] = None,
-        middle_categories: Optional[List[str]] = None,
+        large_categories: Optional[list[str]] = None,
+        middle_categories: Optional[list[str]] = None,
         page: str = "search_filter",
     ):
         """카테고리 선택 로그"""
@@ -257,7 +267,7 @@ class ActivityLogger:
         self,
         city: Optional[str] = None,
         region: Optional[str] = None,
-        grades: Optional[List[str]] = None,
+        grades: Optional[list[str]] = None,
         large_category: Optional[str] = None,
         middle_category: Optional[str] = None,
     ):
@@ -274,7 +284,9 @@ class ActivityLogger:
                     selected_city=city,
                     selected_region=region,
                     selected_grades=grades,
-                    selected_large_categories=[large_category] if large_category else None,
+                    selected_large_categories=[large_category]
+                    if large_category
+                    else None,
                     selected_middle_categories=[middle_category]
                     if middle_category
                     else None,
@@ -290,4 +302,3 @@ def get_activity_logger() -> ActivityLogger:
     if "activity_logger" not in st.session_state:
         st.session_state.activity_logger = ActivityLogger()
     return st.session_state.activity_logger
-

@@ -1,7 +1,7 @@
 # utils/category_manager.py
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any
 
 from utils.api_client import get_yamyam_ops_client
 
@@ -14,7 +14,7 @@ class CategoryManager:
         self._large_categories_cache = None
         self._middle_categories_cache = {}
 
-    def get_large_categories(self) -> List[Dict[str, Any]]:
+    def get_large_categories(self) -> list[dict[str, Any]]:
         """
         대분류 카테고리 목록을 diner_count 높은 순으로 반환 (API 호출)
         """
@@ -46,7 +46,7 @@ class CategoryManager:
             print(f"대분류 카테고리 조회 실패: {e}")
             return self._get_fallback_large_categories()
 
-    def get_middle_categories(self, large_category: str) -> List[Dict[str, Any]]:
+    def get_middle_categories(self, large_category: str) -> list[dict[str, Any]]:
         """
         특정 대분류의 중분류 카테고리 목록을 diner_count 높은 순으로 반환 (API 호출)
         """
@@ -78,7 +78,7 @@ class CategoryManager:
             print(f"중분류 카테고리 조회 실패: {e}")
             return []
 
-    def _get_fallback_large_categories(self) -> List[Dict[str, Any]]:
+    def _get_fallback_large_categories(self) -> list[dict[str, Any]]:
         """API 호출 실패 시 기본 카테고리 반환"""
         return [
             {"name": "한식", "count": 107138},

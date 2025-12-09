@@ -44,7 +44,7 @@ GRADE_COLORS = {
     1: [255, 140, 0],  # 파랑
 }
 
-GRADE_MAP = {"🌟": 1, "🌟��": 2, "🌟🌟🌟": 3}
+GRADE_MAP = {"🌟": 1, "🌟🌟": 2, "🌟🌟🌟": 3}
 
 # large category sorted by priority
 LARGE_CATEGORIES = [

@@ -5,7 +5,6 @@ import streamlit as st
 
 from config.constants import GRADE_MAP
 from utils.app import What2EatApp
-from utils.data_processing import grade_to_stars
 from utils.dialogs import change_location
 from utils.firebase_logger import get_firebase_logger
 
@@ -31,7 +30,6 @@ def render():
     # 앱 인스턴스 가져오기
     if "app" not in st.session_state:
         st.session_state.app = What2EatApp()
-    app = st.session_state.app
 
     st.title("지역별 카테고리 랭킹")
 
@@ -55,34 +53,38 @@ def render():
     selected_grade_values = [GRADE_MAP[grade] for grade in selected_grades]
 
     # 지역 선택 (간소화 - API 기반으로 변경)
-    st.info("💡 랭킹 페이지는 현재 위치 기반으로 조회됩니다. API 기반으로 업데이트되었습니다.")
-    
+    st.info(
+        "💡 랭킹 페이지는 현재 위치 기반으로 조회됩니다. API 기반으로 업데이트되었습니다."
+    )
+
     # 현재 위치 정보 가져오기
     if "user_lat" not in st.session_state or "user_lon" not in st.session_state:
         st.warning("⚠️ 위치 정보가 없습니다. 위치를 설정해주세요.")
         change_location()
         return
-    
+
     user_lat = st.session_state.user_lat
     user_lon = st.session_state.user_lon
-    
+
     # 카테고리 선택
     from utils.category_manager import get_category_manager
-    
+
     category_manager = get_category_manager()
     large_categories = category_manager.get_large_categories()
-    
+
     category_names = ["전체"] + [cat["name"] for cat in large_categories]
     selected_category = st.selectbox("카테고리를 선택하세요", category_names)
-    
+
     # 중분류 카테고리 선택
     selected_small_category = "전체"
     if selected_category != "전체":
         middle_categories = category_manager.get_middle_categories(selected_category)
         if middle_categories:
             middle_names = ["전체"] + [cat["name"] for cat in middle_categories]
-            selected_small_category = st.selectbox("세부 카테고리를 선택하세요", middle_names)
-        
+            selected_small_category = st.selectbox(
+                "세부 카테고리를 선택하세요", middle_names
+            )
+
         _log_user_activity(
             "category_filter",
             {
@@ -90,18 +92,20 @@ def render():
                 "from_page": "ranking",
             },
         )
-    
+
     # API를 통해 음식점 데이터 가져오기
     import asyncio
+
     import pandas as pd
+
     from utils.api_client import get_yamyam_ops_client
-    
+
     try:
         client = get_yamyam_ops_client()
         if not client:
             st.error("❌ API 클라이언트를 초기화할 수 없습니다.")
             return
-        
+
         # 비동기 API 호출
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -110,26 +114,30 @@ def render():
                 user_lat=user_lat,
                 user_lon=user_lon,
                 radius_km=10.0,  # 10km 반경
-                large_categories=[selected_category] if selected_category != "전체" else None,
-                middle_categories=[selected_small_category] if selected_small_category != "전체" else None,
+                large_categories=[selected_category]
+                if selected_category != "전체"
+                else None,
+                middle_categories=[selected_small_category]
+                if selected_small_category != "전체"
+                else None,
                 sort_by="rating",
                 limit=100,
             )
         )
         loop.close()
-        
+
         if not restaurants:
             st.warning("⚠️ 조건에 맞는 음식점이 없습니다.")
             return
-        
+
         filtered_city_df = pd.DataFrame(restaurants)
-        
+
         # 등급 필터링 (API 응답에 diner_grade가 있는 경우)
         if "diner_grade" in filtered_city_df.columns:
             filtered_city_df = filtered_city_df[
                 filtered_city_df["diner_grade"].isin(selected_grade_values)
             ]
-        
+
     except Exception as e:
         st.error(f"❌ 음식점 조회 중 오류가 발생했습니다: {str(e)}")
         return
@@ -148,7 +156,7 @@ def render():
             if selected_small_category != "전체"
             else None,
         )
-    except Exception as e:
+    except Exception:
         # 로깅 실패해도 계속 진행
         pass
 
@@ -174,19 +182,33 @@ def render():
         filtered_city_df_copy["diner_category_middle"] = filtered_city_df_copy[
             "diner_category_middle"
         ].fillna(filtered_city_df_copy.get("diner_category_large", "기타"))
-    
+
     # 필요한 컬럼만 선택 (API 응답에 있는 컬럼만)
     available_columns = filtered_city_df_copy.columns.tolist()
     display_columns = []
-    for col in ["diner_name", "diner_url", "diner_category_middle", "diner_grade", 
-                "diner_review_cnt", "diner_menu_name", "diner_tag", "diner_num_address"]:
+    for col in [
+        "diner_name",
+        "diner_url",
+        "diner_category_middle",
+        "diner_grade",
+        "diner_review_cnt",
+        "diner_menu_name",
+        "diner_tag",
+        "diner_num_address",
+    ]:
         if col in available_columns:
             display_columns.append(col)
-    
+
     # 정렬 (bayesian_score가 있으면 사용, 없으면 diner_review_avg 사용)
-    sort_column = "bayesian_score" if "bayesian_score" in available_columns else "diner_review_avg"
+    sort_column = (
+        "bayesian_score"
+        if "bayesian_score" in available_columns
+        else "diner_review_avg"
+    )
     if sort_column in available_columns:
-        ranked_df = filtered_city_df_copy.sort_values(by=sort_column, ascending=False)[display_columns]
+        ranked_df = filtered_city_df_copy.sort_values(by=sort_column, ascending=False)[
+            display_columns
+        ]
     else:
         ranked_df = filtered_city_df_copy[display_columns]
 
@@ -197,44 +219,51 @@ def render():
         if "selected_restaurant" not in st.session_state:
             st.session_state.selected_restaurant = None
             ranked_df_100 = ranked_df[:100].reset_index(drop=True)
-            ranked_df_100['순위'] = ranked_df_100.index + 1
+            ranked_df_100["순위"] = ranked_df_100.index + 1
 
             # diner_idx를 먼저 저장 (rename 전)
             if "diner_idx" in ranked_df_100.columns:
                 ranked_df_100["원본_diner_idx"] = ranked_df_100["diner_idx"]
-            
-            ranked_df_100.rename(columns={
-                "diner_grade": "등급",
-                "diner_name": "음식점명",
-                "diner_url": "링크",
-                "diner_category_middle": "카테고리",
-                "diner_menu_name": "메뉴",
-                "diner_tag": "태그",
-                "diner_num_address": "주소",
-                "region": "지역",
-                "diner_review_cnt": "리뷰수",
-                "distance": "거리(km)"
-            }, inplace=True)
+
+            ranked_df_100.rename(
+                columns={
+                    "diner_grade": "등급",
+                    "diner_name": "음식점명",
+                    "diner_url": "링크",
+                    "diner_category_middle": "카테고리",
+                    "diner_menu_name": "메뉴",
+                    "diner_tag": "태그",
+                    "diner_num_address": "주소",
+                    "region": "지역",
+                    "diner_review_cnt": "리뷰수",
+                    "distance": "거리(km)",
+                },
+                inplace=True,
+            )
 
             # 각 음식점을 개별 행으로 렌더링하여 클릭 감지 가능하게 만들기
-            from utils.activity_logger import get_activity_logger
-            import pandas as pd
             import re
-            
+
+            import pandas as pd
+
+            from utils.activity_logger import get_activity_logger
+
             for list_idx, (df_idx, row) in enumerate(ranked_df_100.iterrows()):
                 # diner_idx 추출
                 diner_idx = str(row.get("원본_diner_idx", ""))
                 if not diner_idx and "링크" in row:
                     # 링크에서 diner_idx 추출
-                    match = re.search(r'/(\d+)$', str(row["링크"]))
+                    match = re.search(r"/(\d+)$", str(row["링크"]))
                     if match:
                         diner_idx = match.group(1)
-                
+
                 diner_name = row["음식점명"]
                 diner_url = row.get("링크", f"https://place.map.kakao.com/{diner_idx}")
-                
-                col1, col2, col3, col4, col5, col6, col7 = st.columns([0.5, 3, 2, 1, 1, 1, 1])
-                
+
+                col1, col2, col3, col4, col5, col6, col7 = st.columns(
+                    [0.5, 3, 2, 1, 1, 1, 1]
+                )
+
                 with col1:
                     st.write(f"**{int(row['순위'])}**")
                 with col2:
@@ -242,7 +271,11 @@ def render():
                 with col3:
                     st.write(row["카테고리"])
                 with col4:
-                    st.write("⭐" * int(row["등급"]) if pd.notna(row["등급"]) and row["등급"] else "")
+                    st.write(
+                        "⭐" * int(row["등급"])
+                        if pd.notna(row["등급"]) and row["등급"]
+                        else ""
+                    )
                 with col5:
                     st.write(int(row["리뷰수"]) if pd.notna(row["리뷰수"]) else 0)
                 with col6:
@@ -262,11 +295,10 @@ def render():
                             position=int(row["순위"]),
                             page="ranking",
                         )
-                    except Exception as e:
+                    except Exception:
                         # 로깅 실패해도 계속 진행
                         pass
                 if list_idx < len(ranked_df_100) - 1:
                     st.divider()
 
             st.divider()
-

@@ -1,8 +1,8 @@
 # src/utils/pages.py
 
 import streamlit as st
-from config.constants import GRADE_MAP, PRIORITY_ORDER
 
+from config.constants import GRADE_MAP, PRIORITY_ORDER
 from utils.data_processing import (
     category_filters,
     get_filtered_data,
@@ -430,15 +430,16 @@ class PageManager:
                     if user_profile:
                         # 새로운 구조 우선, 기존 구조 fallback
                         preferred_categories = user_profile.get(
-                            "food_preferences_large", 
-                            user_profile.get("food_preferences", [])
+                            "food_preferences_large",
+                            user_profile.get("food_preferences", []),
                         )
                         # 실제 데이터에 존재하는 카테고리만 필터링
                         default_categories = [
-                            cat for cat in preferred_categories 
+                            cat
+                            for cat in preferred_categories
                             if cat in sorted_diner_category_lst
                         ]
-                except Exception as e:
+                except Exception:
                     # 온보딩 정보 로드 실패 시 빈 리스트 사용
                     default_categories = []
 

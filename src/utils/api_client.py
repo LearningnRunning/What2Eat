@@ -5,7 +5,7 @@ Firebase 인증을 사용하여 yamyam-ops PostgreSQL과 통신
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import httpx
 import streamlit as st
@@ -26,19 +26,36 @@ class YamYamOpsClient:
         self.timeout = timeout
 
     def _get_firebase_token(self) -> Optional[str]:
-        """세션에서 JWT Access Token 가져오기 (yamyam-ops용)"""
+        """세션에서 JWT Access Token 또는 Firebase ID Token 가져오기 (yamyam-ops용)"""
         try:
             # 먼저 JWT Access Token 확인 (yamyam-ops API용)
-            if hasattr(st.session_state, "jwt_access_token") and st.session_state.jwt_access_token:
-                # JWT 토큰 만료 확인
-                if hasattr(st.session_state, "jwt_expires_at") and st.session_state.jwt_expires_at:
-                    if datetime.now() < st.session_state.jwt_expires_at:
+            if (
+                hasattr(st.session_state, "jwt_access_token")
+                and st.session_state.jwt_access_token
+            ):
+                # JWT 토큰 만료 확인 (5분 여유를 둠)
+                if (
+                    hasattr(st.session_state, "jwt_expires_at")
+                    and st.session_state.jwt_expires_at
+                ):
+                    buffer_time = timedelta(minutes=5)
+                    if datetime.now() + buffer_time < st.session_state.jwt_expires_at:
                         return st.session_state.jwt_access_token
                     else:
-                        # JWT 토큰이 만료되었으면 갱신 시도
+                        # JWT 토큰이 만료되었거나 곧 만료될 예정이면 갱신 시도
+                        logger.info(
+                            "JWT 토큰이 만료되었거나 곧 만료될 예정입니다. 갱신 시도 중..."
+                        )
                         if self._refresh_jwt_token():
                             return st.session_state.jwt_access_token
-                
+                        else:
+                            logger.warning(
+                                "JWT 토큰 갱신 실패. Firebase ID Token으로 폴백합니다."
+                            )
+                else:
+                    # 만료 시간 정보가 없으면 그냥 사용 (하위 호환성)
+                    return st.session_state.jwt_access_token
+
             # JWT 토큰이 없거나 만료된 경우, Firebase ID Token으로 폴백
             # (하위 호환성을 위해)
             from utils.auth import get_current_user
@@ -46,40 +63,88 @@ class YamYamOpsClient:
             user_info = get_current_user()
             if user_info:
                 # Firebase ID Token 가져오기
-                if hasattr(st.session_state, "auth_token") and st.session_state.auth_token:
+                if (
+                    hasattr(st.session_state, "auth_token")
+                    and st.session_state.auth_token
+                ):
                     return st.session_state.auth_token
-                    
+
             return None
         except Exception as e:
             logger.error(f"Token 가져오기 실패: {e}")
             return None
-    
+
     def _refresh_jwt_token(self) -> bool:
         """JWT Refresh Token으로 Access Token 갱신"""
         try:
-            if not hasattr(st.session_state, "jwt_refresh_token") or not st.session_state.jwt_refresh_token:
+            from utils.session_manager import get_session_manager
+
+            session_manager = get_session_manager()
+
+            # 세션 상태 또는 쿠키에서 JWT Refresh Token 가져오기
+            jwt_refresh_token = None
+            if (
+                hasattr(st.session_state, "jwt_refresh_token")
+                and st.session_state.jwt_refresh_token
+            ):
+                jwt_refresh_token = st.session_state.jwt_refresh_token
+            else:
+                # 쿠키에서 가져오기
+                try:
+                    all_cookies = session_manager.cookie_manager.get_all()
+                    jwt_refresh_token = all_cookies.get(
+                        session_manager.jwt_refresh_cookie_key
+                    )
+                except Exception:
+                    pass
+
+            if not jwt_refresh_token:
                 return False
-            
+
             api_url = st.secrets.get("YAMYAM_OPS_API_URL")
             if not api_url:
                 return False
-            
-            url = f"{api_url.rstrip('/')}/api/v1/auth/refresh"
-            payload = {"refresh_token": st.session_state.jwt_refresh_token}
-            
+
+            url = f"{api_url.rstrip('/')}/auth/refresh"
+            payload = {"refresh_token": jwt_refresh_token}
+
             response = httpx.post(url, json=payload, timeout=10)
-            
+
             if response.status_code == 200:
                 data = response.json()
-                st.session_state.jwt_access_token = data.get("access_token")
+                new_access_token = data.get("access_token")
                 expires_in = data.get("expires_in")
+
+                # 세션 상태에 저장
+                st.session_state.jwt_access_token = new_access_token
                 if expires_in:
-                    st.session_state.jwt_expires_at = datetime.now() + timedelta(seconds=expires_in)
+                    st.session_state.jwt_expires_at = datetime.now() + timedelta(
+                        seconds=expires_in
+                    )
+
+                # 쿠키에도 저장 (7일 유효)
+                try:
+                    if "cookie_set_counter" not in st.session_state:
+                        st.session_state.cookie_set_counter = 0
+                    st.session_state.cookie_set_counter += 1
+                    counter = st.session_state.cookie_set_counter
+
+                    session_manager.cookie_manager.set(
+                        session_manager.jwt_access_cookie_key,
+                        new_access_token,
+                        expires_at=datetime.now() + timedelta(days=7),
+                        key=f"cookie_set_{session_manager.jwt_access_cookie_key}_{counter}",
+                    )
+                except Exception as cookie_error:
+                    logger.warning(f"JWT Access Token 쿠키 저장 실패: {cookie_error}")
+
                 return True
             else:
-                logger.error(f"JWT 토큰 갱신 실패: {response.status_code} - {response.text}")
+                logger.error(
+                    f"JWT 토큰 갱신 실패: {response.status_code} - {response.text}"
+                )
                 return False
-                
+
         except Exception as e:
             logger.error(f"JWT 토큰 갱신 중 오류: {e}")
             return False
@@ -88,10 +153,10 @@ class YamYamOpsClient:
         self,
         method: str,
         endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
+        data: Optional[dict[str, Any]] = None,
+        params: Optional[dict[str, Any]] = None,
         max_retries: int = 3,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """
         API 요청 실행 (재시도 로직 포함)
 
@@ -111,7 +176,10 @@ class YamYamOpsClient:
             return None
 
         url = f"{self.base_url}{endpoint}"
-        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
 
         for attempt in range(max_retries):
             try:
@@ -119,9 +187,13 @@ class YamYamOpsClient:
                     if method.upper() == "GET":
                         response = await client.get(url, headers=headers, params=params)
                     elif method.upper() == "POST":
-                        response = await client.post(url, headers=headers, json=data, params=params)
+                        response = await client.post(
+                            url, headers=headers, json=data, params=params
+                        )
                     elif method.upper() == "PATCH":
-                        response = await client.patch(url, headers=headers, json=data, params=params)
+                        response = await client.patch(
+                            url, headers=headers, json=data, params=params
+                        )
                     else:
                         logger.error(f"지원하지 않는 HTTP 메서드: {method}")
                         return None
@@ -190,12 +262,12 @@ class YamYamOpsClient:
         radius_km: Optional[float] = None,
         large_categories: Optional[list] = None,
         middle_categories: Optional[list] = None,
-        sort_by: str = "rating",
+        sort_by: str = "popularity",
         limit: Optional[int] = None,
         offset: int = 0,
     ) -> Optional[list]:
         """
-        음식점 목록 조회 (필터링 및 정렬)
+        음식점 목록 조회 (필터링 및 정렬) [DEPRECATED]
 
         Args:
             user_lat: 사용자 위도
@@ -209,6 +281,9 @@ class YamYamOpsClient:
 
         Returns:
             음식점 리스트 또는 None
+
+        Note:
+            이 메서드는 deprecated 되었습니다. get_filtered_restaurants와 sort_restaurants를 사용하세요.
         """
         try:
             # 쿼리 파라미터 구성
@@ -222,9 +297,13 @@ class YamYamOpsClient:
             if large_categories:
                 # 여러 카테고리를 지원하려면 리스트로 전달 (FastAPI가 자동 처리)
                 # 단일 값으로 전달하는 경우 첫 번째 값만 사용
-                params["diner_category_large"] = large_categories[0] if large_categories else None
+                params["diner_category_large"] = (
+                    large_categories[0] if large_categories else None
+                )
             if middle_categories:
-                params["diner_category_middle"] = middle_categories[0] if middle_categories else None
+                params["diner_category_middle"] = (
+                    middle_categories[0] if middle_categories else None
+                )
             if sort_by:
                 params["sort_by"] = sort_by
             if limit is not None:
@@ -241,7 +320,118 @@ class YamYamOpsClient:
             logger.error(f"음식점 조회 중 예외 발생: {e}")
             return None
 
-    async def get_restaurant_by_idx(self, diner_idx: int) -> Optional[Dict[str, Any]]:
+    async def get_filtered_restaurants(
+        self,
+        user_lat: float,
+        user_lon: float,
+        radius_km: float,
+        large_categories: Optional[list[str]] = None,
+        middle_categories: Optional[list[str]] = None,
+        limit: Optional[int] = None,
+    ) -> Optional[tuple[list[str], dict[str, float]]]:
+        """
+        음식점 필터링 (지역/카테고리)
+
+        Args:
+            user_lat: 사용자 위도
+            user_lon: 사용자 경도
+            radius_km: 검색 반경 (km)
+            large_categories: 대분류 카테고리 리스트
+            middle_categories: 중분류 카테고리 리스트
+            limit: 최대 결과 수
+
+        Returns:
+            (diner_ids 리스트, 거리 딕셔너리) 튜플 또는 None
+            거리 딕셔너리: {id: distance} 형식
+        """
+        try:
+            params = {
+                "user_lat": user_lat,
+                "user_lon": user_lon,
+                "radius_km": radius_km,
+            }
+
+            # 카테고리 파라미터 추가 (현재 API는 단일 값만 지원하므로 첫 번째 값 사용)
+            if large_categories and len(large_categories) > 0:
+                params["diner_category_large"] = large_categories[0]
+
+            if middle_categories and len(middle_categories) > 0:
+                params["diner_category_middle"] = middle_categories[0]
+
+            if limit is not None:
+                params["limit"] = limit
+
+            result = await self._make_request(
+                "GET", "/kakao/diners/filtered", params=params
+            )
+
+            if not result:
+                return None
+
+            # diner_ids 리스트와 거리 딕셔너리 추출
+            diner_ids = [item["id"] for item in result]
+            distance_dict = {item["id"]: float(item["distance"]) for item in result}
+
+            return (diner_ids, distance_dict)
+
+        except Exception as e:
+            logger.error(f"음식점 필터링 중 예외 발생: {e}")
+            return None
+
+    async def sort_restaurants(
+        self,
+        diner_ids: list[str],
+        sort_by: str = "popularity",
+        user_id: Optional[str] = None,
+        user_lat: Optional[float] = None,
+        user_lon: Optional[float] = None,
+        min_rating: Optional[float] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> Optional[list]:
+        """
+        음식점 정렬/필터링
+
+        Args:
+            diner_ids: 정렬할 음식점 ID 리스트 (ULID)
+            sort_by: 정렬 기준 (personalization, popularity, hidden_gem, rating, distance, review_count)
+            user_id: 사용자 ID (개인화 정렬용)
+            user_lat: 사용자 위도 (거리 정렬용)
+            user_lon: 사용자 경도 (거리 정렬용)
+            min_rating: 최소 평점
+            limit: 최대 결과 수
+            offset: 페이지네이션 오프셋
+
+        Returns:
+            정렬된 음식점 리스트 또는 None
+        """
+        try:
+            data = {
+                "diner_ids": diner_ids,
+                "sort_by": sort_by,
+            }
+
+            if user_id:
+                data["user_id"] = user_id
+            if user_lat is not None:
+                data["user_lat"] = user_lat
+            if user_lon is not None:
+                data["user_lon"] = user_lon
+            if min_rating is not None:
+                data["min_rating"] = min_rating
+            if limit is not None:
+                data["limit"] = limit
+            if offset is not None:
+                data["offset"] = offset
+
+            result = await self._make_request("POST", "/kakao/diners/sorted", data=data)
+            return result if result else []
+
+        except Exception as e:
+            logger.error(f"음식점 정렬 중 예외 발생: {e}")
+            return None
+
+    async def get_restaurant_by_idx(self, diner_idx: int) -> Optional[dict[str, Any]]:
         """
         특정 음식점 상세 조회
 
@@ -275,26 +465,49 @@ class YamYamOpsClient:
         try:
             params = {}
             if category_type == "large":
-                endpoint = "/kakao/diners/categories/large/"
+                endpoint = "/kakao/diners/categories/large"
             elif category_type == "middle":
                 if not parent_category:
                     logger.error("중분류 조회 시 parent_category 필수")
                     return None
-                endpoint = "/kakao/diners/categories/middle/"
+                endpoint = "/kakao/diners/categories/middle"
                 params["large_category"] = parent_category
             else:
                 logger.error(f"잘못된 category_type: {category_type}")
                 return None
 
-            result = await self._make_request("GET", endpoint, params=params if params else None)
+            result = await self._make_request(
+                "GET", endpoint, params=params if params else None
+            )
             return result if result else []
 
         except Exception as e:
             logger.error(f"카테고리 통계 조회 중 예외 발생: {e}")
             return None
 
+    async def get_current_user_info(self) -> Optional[dict[str, Any]]:
+        """
+        현재 사용자 정보 조회 (has_completed_onboarding, is_personalization_enabled 포함)
+
+        Returns:
+            사용자 정보 딕셔너리 또는 None
+        """
+        try:
+            result = await self._make_request("GET", "/users/me")
+
+            if result:
+                logger.info("사용자 정보 조회 성공")
+                return result
+            else:
+                logger.error("사용자 정보 조회 실패")
+                return None
+
+        except Exception as e:
+            logger.error(f"사용자 정보 조회 중 예외 발생: {e}")
+            return None
+
     async def save_onboarding_data(
-        self, profile_data: Dict[str, Any], ratings_data: Dict[str, int]
+        self, profile_data: dict[str, Any], ratings_data: dict[str, int]
     ) -> bool:
         """
         온보딩 완료 시 프로필 데이터를 PostgreSQL에 저장
@@ -356,4 +569,3 @@ def get_yamyam_ops_client() -> Optional[YamYamOpsClient]:
     except Exception as e:
         logger.error(f"yamyam-ops 클라이언트 초기화 실패: {e}")
         return None
-
