@@ -3,16 +3,68 @@
 import math
 import random
 from typing import List, Dict, Optional, Any
+from collections import Counter
 import streamlit as st
-import pandas as pd
 import requests
+import google.generativeai as genai
+
+
+def analyze_user_preference(selected_diners: List[Dict[str, Any]]) -> str:
+    """LLM(Gemini)로 유저 맛집 취향 분석"""
+    API_KEYS = st.secrets.get("GEMINI_API_KEYS", [])
+    if not API_KEYS:
+        return "❌ LLM 분석 실패: GEMINI_API_KEYS가 설정되지 않았습니다."
+    
+    api_keys = [k.strip() for k in API_KEYS.split(",") if k.strip()]
+
+    # LLM에게 넘길 식당 정보 요약 만들기
+    formatted = []
+    for d in selected_diners:
+        formatted.append({
+            "name": d.get("diner_name"),
+            "category_large": d.get("diner_category_large"),
+            "category_middle": d.get("diner_category_middle"),
+            "rating": d.get("rating"),
+            "review_count": d.get("review_cnt"),
+            "address": d.get("address"),
+        })
+
+    prompt = f"""
+    아래는 사용자가 맛집 월드컵에서 선택한 식당 정보 목록입니다.
+    이 식당들의 특징을 분석해 '맛집 취향 분석 리포트'를 작성해주세요.
+
+    - 카테고리 성향 분석
+    - 양식/한식/일식 등 선호도 분석
+    - 맛/분위기/가격대 특성 요약
+    - 사용자가 어떤 포인트를 중요하게 보는지 (예: 리뷰 많은 곳, 평점 높은 곳)
+    - 전반적인 맛집 성향 요약 (3~5줄)
+
+    식당 목록:
+    {formatted}
+
+    결과는 한국어로, 친절한 추천/분석 형태로 작성해주세요.
+    """
+
+    last_error = None
+    for key in api_keys:
+        try:
+            genai.configure(api_key=key)
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            response = model.generate_content(prompt)
+
+            return response.text
+
+        except Exception as e:
+            last_error = e
+            continue  # 다음 Key로 retry
+
+    return f"❌ LLM 분석 실패: 모든 API Key 요청 실패\n마지막 오류: {last_error}"
 
 
 class WorldCupManager:
     """맛집 월드컵 관리 클래스"""
     
-    def __init__(self, df_diner: pd.DataFrame, api_url: str = st.secrets.get("API_URL")):
-        self.df_diner = df_diner
+    def __init__(self, api_url: str = st.secrets.get("API_URL")):
         self.api_url = api_url
         self.category_icons = {
             "카페": "☕",
@@ -22,12 +74,48 @@ class WorldCupManager:
             "디저트": "🍰",
             "기타": "🍽"
         }
+
+    def get_random_diners(self, n: int = 2) -> List[Dict[str, Any]]:
+        """API에서 랜덤 식당 가져오기"""
+        try:
+            response = requests.get(
+                f"{self.api_url}/kakao/diners/filtered",
+                params={"n": n},
+                timeout=20
+            )
+            if response.status_code == 200:
+                diners = response.json()
+                # API response가 리스트 형태인지 확인
+                if isinstance(diners, list):
+                    return diners
+                # 단일 객체로 반환될 경우를 대비
+                elif isinstance(diners, dict):
+                    return [diners]
+        except Exception as e:
+            print(f"랜덤 식당 조회 실패: {e}")
+        
+        return []
+
+    def get_diner_by_idx(self, diner_idx: int) -> Optional[Dict[str, Any]]:
+        """diner_idx로 특정 식당 정보 가져오기"""
+        try:
+            response = requests.get(
+                f"{self.api_url}/kakao/diners/{diner_idx}",
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+        except Exception as e:
+            print(f"식당 정보 조회 실패 (diner_idx: {diner_idx}): {e}")
+        
+        return None
     
     def get_similar_restaurants(self, diner_idx: int) -> List[int]:
         """Redis에서 유사 식당 ID 리스트 가져오기"""
         try:
             response = requests.post(
-                self.api_url,
+                self.api_url + "/api/v1/redis/read",
                 json={"keys": [f"diner:{diner_idx}:similar_diner_ids"]},
                 timeout=3
             )
@@ -42,58 +130,126 @@ class WorldCupManager:
         
         return []
     
-    def build_tournament_candidates(self, size: int = 8) -> List[Dict[str, Any]]:
-        """토너먼트 후보 생성 (첫 2개는 랜덤, 나머지는 유사 식당)"""
-        # 1단계: 랜덤으로 첫 2개 선택
-        initial_candidates = self.df_diner.sample(n=2).to_dict("records")
+    def build_tournament_candidates(self, selected_diner: Dict[str, Any], size: int = 8) -> List[Dict[str, Any]]:
+        """토너먼트 후보 생성 (유저가 선택한 식당 + 유사 식당 7개)"""
+        # 1단계: 선택한 식당을 첫 번째 후보로 추가
+        all_candidates = [selected_diner]
         
-        # 2단계: 첫 번째 식당의 유사 식당 가져오기
-        first_diner_idx = initial_candidates[0].get("diner_idx")
-        similar_ids = self.get_similar_restaurants(first_diner_idx) if first_diner_idx else []
+        # 2단계: 선택한 식당의 유사 식당 ID 가져오기
+        selected_diner_idx = selected_diner.get("diner_idx")
+        similar_ids = self.get_similar_restaurants(selected_diner_idx) if selected_diner_idx else []
         
-        # 3단계: 유사 식당을 DataFrame에서 찾기
+        # 3단계: 유사 식당 정보 가져오기
         similar_restaurants = []
+        needed = size - 1  # 선택한 식당 제외 필요 개수
+        
         if similar_ids:
-            similar_df = self.df_diner[self.df_diner["diner_idx"].isin(similar_ids)]
-            similar_restaurants = similar_df.to_dict("records")
-
-        # 4단계: 부족한 경우 두 번째 식당의 유사 식당 추가
-        needed = size - 2
+            existing_ids = {selected_diner["diner_idx"]}
+            for sim_id in similar_ids:
+                if len(similar_restaurants) >= needed:
+                    break
+                if sim_id not in existing_ids:
+                    diner = self.get_diner_by_idx(sim_id)
+                    if diner:
+                        similar_restaurants.append(diner)
+                        existing_ids.add(sim_id)
+        
+        # 4단계: 부족하면 추가 랜덤 식당으로 채우기
         if len(similar_restaurants) < needed:
-            if similar_restaurants:
-                second_diner_idx = similar_restaurants[0].get("diner_idx")
-            else:
-                second_diner_idx = initial_candidates[1].get("diner_idx")
-            second_similar_ids = self.get_similar_restaurants(second_diner_idx) if second_diner_idx else []
+            shortage = needed - len(similar_restaurants)
+            additional_random = self.get_random_diners(n=shortage * 2)  # 여유있게 요청
             
-            if second_similar_ids:
-                # 이미 선택된 ID 제외
-                existing_ids = {r["diner_idx"] for r in similar_restaurants}
-                new_similar_ids = [sid for sid in second_similar_ids if sid not in existing_ids]
-                
-                if new_similar_ids:
-                    second_similar_df = self.df_diner[self.df_diner["diner_idx"].isin(new_similar_ids)]
-                    similar_restaurants.extend(second_similar_df.to_dict("records"))
-
-        # 5단계: 여전히 부족하면 랜덤으로 채우기
-        if len(similar_restaurants) < needed:
-            existing_indices = {r["diner_idx"] for r in initial_candidates + similar_restaurants}
-            remaining_df = self.df_diner[~self.df_diner["diner_idx"].isin(existing_indices)]
-            
-            if not remaining_df.empty:
-                num_random = min(needed - len(similar_restaurants), len(remaining_df))
-                random_restaurants = remaining_df.sample(n=num_random).to_dict("records")
-                similar_restaurants.extend(random_restaurants)
-
-        # 6단계: 최종 후보 리스트 생성 (초기 2개 + 유사/랜덤)
-        all_candidates = initial_candidates + similar_restaurants[:needed]
+            existing_ids = {r["diner_idx"] for r in all_candidates + similar_restaurants}
+            for diner in additional_random:
+                if len(similar_restaurants) >= needed:
+                    break
+                if diner["diner_idx"] not in existing_ids:
+                    similar_restaurants.append(diner)
+                    existing_ids.add(diner["diner_idx"])
+        
+        # 5단계: 최종 후보 리스트 생성 (선택한 식당 + 선택 안한 식당 + 유사 식당들)
+        all_candidates.extend(similar_restaurants[:needed])
         random.shuffle(all_candidates)
         
         return all_candidates
     
-    def start_tournament(self, size: int = 8):
-        """토너먼트 시작"""
-        candidates = self.build_tournament_candidates(size)
+    def show_initial_selection(self):
+        """초기 2개 식당 선택 화면"""
+        if "initial_diners" not in st.session_state:
+            initial_diners = self.get_random_diners(n=2)
+            if len(initial_diners) < 2:
+                st.error("초기 식당을 불러오는데 실패했습니다. 다시 시도해주세요.")
+                return False
+            st.session_state.initial_diners = initial_diners
+        
+        st.markdown("<h3 style='text-align:center;'>🎯 시작할 식당을 선택하세요</h3>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:gray;'>선택한 식당과 비슷한 맛집들로 토너먼트가 구성됩니다</p>", unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        for idx, col in enumerate([col1, col2]):
+            with col:
+                restaurant = st.session_state.initial_diners[idx]
+                self.render_initial_selection_card(restaurant, idx)
+        
+        return True
+    
+    def render_initial_selection_card(self, restaurant: Dict[str, Any], idx: int):
+        """초기 선택용 식당 카드 렌더링"""
+        category_icon = self.category_icons.get(restaurant.get("diner_category_large"), "🍽")
+        category_text = self.get_category_text(
+            restaurant.get("diner_category_large"),
+            restaurant.get("diner_category_middle")
+        )
+        
+        # diner_url이 없을 경우 카카오맵 URL 생성
+        diner_url = restaurant.get("diner_url")
+        if not diner_url:
+            diner_name = restaurant.get("diner_name", "")
+            diner_url = f"https://map.kakao.com/?q={diner_name}"
+        
+        st.markdown(
+            f"""
+            <div style='border: 1px solid #e0e0e0; border-radius: 12px;
+                        padding: 20px; text-align: center; 
+                        background-color: #ffffff;
+                        box-shadow: 0px 2px 6px rgba(0,0,0,0.05);
+                        margin-bottom: 20px;'>
+                <div style='font-size:60px;'>{category_icon}</div>
+                <h4 style='margin-top: 10px; margin-bottom: 5px;'>{restaurant['diner_name']}</h4>
+                <p style='color: gray; margin-top: 0;'>{category_text}</p>
+                <a href='{diner_url}' target='_blank' style='
+                    display:inline-block;
+                    padding:8px 16px;
+                    margin-top:10px;
+                    background-color:#1f77b4;
+                    color:white;
+                    border-radius:6px;
+                    text-decoration:none;
+                '>🔍 음식점 보기</a>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        
+        if st.button(
+            "🎯 이 식당으로 시작",
+            key=f"initial_select_{restaurant['diner_idx']}",
+            use_container_width=True,
+            type="primary"
+        ):
+            self.start_tournament_with_selection(idx)
+    
+    def start_tournament_with_selection(self, selected_idx: int):
+        """선택된 식당으로 토너먼트 시작"""
+        selected_diner = st.session_state.initial_diners[selected_idx]
+        
+        # 토너먼트 후보 생성 (선택한 식당 기반 유사 식당 포함)
+        candidates = self.build_tournament_candidates(selected_diner, size=8)
+        
+        if not candidates or len(candidates) < 8:
+            st.error(f"토너먼트를 시작하기에 충분한 식당(8개)을 불러오지 못했습니다.")
+            return
         
         # 매치 생성
         matches = []
@@ -109,11 +265,26 @@ class WorldCupManager:
         st.session_state.round = 1
         st.session_state.winners = []
         st.session_state.tournament_started = True
+        st.session_state.initial_selection_done = True
+        # 선택한 식당들을 추적하기 위한 리스트 초기화
+        st.session_state.all_selected_diners = []
+        
+        # 초기 식당 선택 정보 제거
+        if "initial_diners" in st.session_state:
+            del st.session_state.initial_diners
+        
+        st.rerun()
     
     def select_winner(self, winner_idx: int):
         """승자 선택 및 다음 라운드 진행"""
         winner = st.session_state.matches[st.session_state.current_match_index][winner_idx]
         st.session_state.winners.append(winner)
+        
+        # 선택한 식당을 추적 리스트에 추가
+        if "all_selected_diners" not in st.session_state:
+            st.session_state.all_selected_diners = []
+        st.session_state.all_selected_diners.append(winner)
+        
         st.session_state.current_match_index += 1
         
         # 라운드 종료 확인
@@ -152,13 +323,134 @@ class WorldCupManager:
         else:
             return large or middle
     
+    def render_statistics(self):
+        """토너먼트 종료 후 통계 표시"""
+        if not st.session_state.get("all_selected_diners"):
+            return
+        
+        st.markdown("---")
+        st.markdown("### 📊 토너먼트 통계")
+        
+        selected_diners = st.session_state.all_selected_diners
+        
+        # 기본 통계
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("총 선택 횟수", f"{len(selected_diners)}번")
+        with col2:
+            unique_count = len(set(d["diner_idx"] for d in selected_diners))
+            st.metric("선택한 식당 수", f"{unique_count}개")
+        with col3:
+            if st.session_state.winners:
+                winner = st.session_state.winners[0]
+                winner_count = sum(1 for d in selected_diners if d["diner_idx"] == winner["diner_idx"])
+                st.metric("우승 식당 선택 횟수", f"{winner_count}번")
+        
+        # 카테고리 분석
+        st.markdown("#### 🍽️ 선호 카테고리")
+        categories = [d.get("diner_category_large", "기타") for d in selected_diners if d.get("diner_category_large")]
+        
+        if categories:
+            category_counts = Counter(categories)
+            
+            # 카테고리별 선택 횟수 표시
+            cols = st.columns(min(len(category_counts), 4))
+            for idx, (category, count) in enumerate(category_counts.most_common()):
+                with cols[idx % len(cols)]:
+                    icon = self.category_icons.get(category, "🍽")
+                    percentage = (count / len(selected_diners)) * 100
+                    st.markdown(
+                        f"""
+                        <div style='text-align: center; padding: 10px; 
+                                    background-color: #f0f2f6; border-radius: 8px; margin-bottom: 10px;'>
+                            <div style='font-size: 30px;'>{icon}</div>
+                            <div style='font-weight: bold;'>{category}</div>
+                            <div style='color: #666;'>{count}번 ({percentage:.1f}%)</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+        
+        # 선택한 식당 목록 (확장 가능)
+        with st.expander("📝 선택한 모든 식당 보기"):
+            # 식당별 선택 횟수 계산
+            diner_counts = {}
+            for diner in selected_diners:
+                idx = diner["diner_idx"]
+                if idx not in diner_counts:
+                    diner_counts[idx] = {"diner": diner, "count": 0}
+                diner_counts[idx]["count"] += 1
+            
+            # 선택 횟수 순으로 정렬
+            sorted_diners = sorted(diner_counts.values(), key=lambda x: x["count"], reverse=True)
+            
+            for item in sorted_diners:
+                diner = item["diner"]
+                count = item["count"]
+                
+                category_text = self.get_category_text(
+                    diner.get("diner_category_large"),
+                    diner.get("diner_category_middle")
+                )
+                
+                # diner_url 처리
+                diner_url = diner.get("diner_url")
+                if not diner_url:
+                    diner_name = diner.get("diner_name", "")
+                    diner_url = f"https://map.kakao.com/?q={diner_name}"
+                
+                # 우승 식당 표시
+                is_winner = (st.session_state.winners and 
+                           diner["diner_idx"] == st.session_state.winners[0]["diner_idx"])
+                winner_badge = "🏆 " if is_winner else ""
+                
+                st.markdown(
+                    f"""
+                    <div style='padding: 10px; margin-bottom: 8px; 
+                                border-left: 4px solid {"#FFD700" if is_winner else "#1f77b4"}; 
+                                background-color: #f9f9f9;'>
+                        <strong>{winner_badge}{diner['diner_name']}</strong> 
+                        <span style='color: #666;'>({category_text})</span>
+                        <span style='float: right; color: #1f77b4; font-weight: bold;'>{count}번 선택</span>
+                        <br>
+                        <a href='{diner_url}' target='_blank' style='font-size: 0.9em; color: #1f77b4;'>
+                            🔗 상세보기
+                        </a>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        # --- LLM 취향 분석 ---
+        st.markdown("### 🤖 AI 맛집 취향 분석 결과")
+
+        with st.spinner("AI가 맛집 취향을 분석 중입니다..."):
+            result = analyze_user_preference(selected_diners)
+
+        st.markdown(
+            f"""
+            <div style='padding:15px; background-color:#f7f9fc; border-radius:10px;
+                        border-left:5px solid #1f77b4; margin-top:10px;'>
+                {result}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    
     def render_restaurant_card(self, restaurant: Dict[str, Any], idx: int):
         """식당 카드 렌더링"""
-        category_icon = self.category_icons.get(restaurant["diner_category_large"], "🍽")
+        category_icon = self.category_icons.get(restaurant.get("diner_category_large"), "🍽")
         category_text = self.get_category_text(
-            restaurant["diner_category_large"],
+            restaurant.get("diner_category_large"),
             restaurant.get("diner_category_middle")
         )
+        
+        # diner_url이 없을 경우 카카오맵 URL 생성
+        diner_url = restaurant.get("diner_url")
+        if not diner_url:
+            diner_name = restaurant.get("diner_name", "")
+            diner_url = f"https://map.kakao.com/?q={diner_name}"
         
         st.markdown(
             f"""
@@ -170,7 +462,7 @@ class WorldCupManager:
                 <div style='font-size:60px;'>{category_icon}</div>
                 <h4 style='margin-top: 10px; margin-bottom: 5px;'>{restaurant['diner_name']}</h4>
                 <p style='color: gray; margin-top: 0;'>{category_text}</p>
-                <a href='{restaurant["diner_url"]}' target='_blank' style='
+                <a href='{diner_url}' target='_blank' style='
                     display:inline-block;
                     padding:8px 16px;
                     margin-top:10px;
@@ -203,31 +495,46 @@ class WorldCupManager:
             "current_match_index": 0,
             "winners": [],
             "tournament_started": False,
-            "tournament_finished": False
+            "tournament_finished": False,
+            "initial_selection_done": False,
+            "all_selected_diners": []
         }.items():
             if key not in st.session_state:
                 st.session_state[key] = default
         
-        # 토너먼트 시작 버튼
+        # 토너먼트 시작 전 - 초기 선택 화면
         if not st.session_state.tournament_started or st.session_state.tournament_finished:
-            if st.button("🎮 토너먼트 시작", type="primary", use_container_width=True):
-                self.start_tournament(size=8)
-                st.session_state.tournament_finished = False
-                st.rerun()
-        
-        # 최종 우승자 표시
-        if st.session_state.tournament_finished and st.session_state.winners:
-            winner = st.session_state.winners[0]
-            st.success(f"🏆 최종 우승: {winner['diner_name']}")
-            st.markdown(f"[🔗 음식점 보기]({winner['diner_url']})")
-            
-            if st.button("🔄 다시 하기", use_container_width=True):
-                st.session_state.tournament_started = False
-                st.session_state.tournament_finished = False
-                st.rerun()
+            if st.session_state.tournament_finished:
+                # 최종 우승자 표시
+                if st.session_state.winners:
+                    winner = st.session_state.winners[0]
+                    st.success(f"🏆 최종 우승: {winner['diner_name']}")
+                    
+                    # diner_url 처리
+                    diner_url = winner.get("diner_url")
+                    if not diner_url:
+                        diner_name = winner.get("diner_name", "")
+                        diner_url = f"https://map.kakao.com/?q={diner_name}"
+                    
+                    st.markdown(f"[🔗 음식점 보기]({diner_url})")
+                    
+                    # 통계 표시
+                    self.render_statistics()
+                
+                if st.button("🔄 다시 하기", use_container_width=True):
+                    # 모든 세션 상태 초기화
+                    for key in ["tournament_started", "tournament_finished", "initial_selection_done", 
+                               "matches", "winners", "current_match_index", "round", "initial_diners",
+                               "all_selected_diners"]:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    st.rerun()
+            else:
+                # 초기 선택 화면
+                self.show_initial_selection()
             return
         
-        # 현재 매치 표시
+        # 토너먼트 진행 중 - 현재 매치 표시
         if (st.session_state.matches and 
             st.session_state.current_match_index < len(st.session_state.matches)):
             
@@ -248,8 +555,8 @@ class WorldCupManager:
                         st.write("자동 진출 (bye)")
 
 
-def get_worldcup_manager(df_diner: pd.DataFrame) -> WorldCupManager:
+def get_worldcup_manager() -> WorldCupManager:
     """WorldCupManager 싱글톤 인스턴스 반환"""
     if "worldcup_manager" not in st.session_state:
-        st.session_state.worldcup_manager = WorldCupManager(df_diner)
+        st.session_state.worldcup_manager = WorldCupManager()
     return st.session_state.worldcup_manager
