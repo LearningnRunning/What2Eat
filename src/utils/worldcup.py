@@ -11,43 +11,54 @@ import google.generativeai as genai
 
 def analyze_user_preference(selected_diners: List[Dict[str, Any]]) -> str:
     """LLM(Gemini)로 유저 맛집 취향 분석"""
-    try:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    API_KEYS = st.secrets.get("GEMINI_API_KEYS", [])
+    if not API_KEYS:
+        return "❌ LLM 분석 실패: GEMINI_API_KEYS가 설정되지 않았습니다."
+    
+    api_keys = [k.strip() for k in API_KEYS.split(",") if k.strip()]
 
-        # LLM에게 넘길 식당 정보 요약 만들기
-        formatted = []
-        for d in selected_diners:
-            formatted.append({
-                "name": d.get("diner_name"),
-                "category_large": d.get("diner_category_large"),
-                "category_middle": d.get("diner_category_middle"),
-                "rating": d.get("rating"),
-                "review_count": d.get("review_cnt"),
-                "address": d.get("address"),
-            })
+    # LLM에게 넘길 식당 정보 요약 만들기
+    formatted = []
+    for d in selected_diners:
+        formatted.append({
+            "name": d.get("diner_name"),
+            "category_large": d.get("diner_category_large"),
+            "category_middle": d.get("diner_category_middle"),
+            "rating": d.get("rating"),
+            "review_count": d.get("review_cnt"),
+            "address": d.get("address"),
+        })
 
-        prompt = f"""
-        아래는 사용자가 맛집 월드컵에서 선택한 식당 정보 목록입니다.
-        이 식당들의 특징을 분석해 '맛집 취향 분석 리포트'를 작성해주세요.
+    prompt = f"""
+    아래는 사용자가 맛집 월드컵에서 선택한 식당 정보 목록입니다.
+    이 식당들의 특징을 분석해 '맛집 취향 분석 리포트'를 작성해주세요.
 
-        - 카테고리 성향 분석
-        - 양식/한식/일식 등 선호도 분석
-        - 맛/분위기/가격대 특성 요약
-        - 사용자가 어떤 포인트를 중요하게 보는지 (예: 리뷰 많은 곳, 평점 높은 곳)
-        - 전반적인 맛집 성향 요약 (3~5줄)
+    - 카테고리 성향 분석
+    - 양식/한식/일식 등 선호도 분석
+    - 맛/분위기/가격대 특성 요약
+    - 사용자가 어떤 포인트를 중요하게 보는지 (예: 리뷰 많은 곳, 평점 높은 곳)
+    - 전반적인 맛집 성향 요약 (3~5줄)
 
-        식당 목록:
-        {formatted}
+    식당 목록:
+    {formatted}
 
-        결과는 한국어로, 친절한 추천/분석 형태로 작성해주세요.
-        """
-        
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        response = model.generate_content(prompt)
-        return response.text
+    결과는 한국어로, 친절한 추천/분석 형태로 작성해주세요.
+    """
 
-    except Exception as e:
-        return f"LLM 분석 실패: {e}"
+    last_error = None
+    for key in api_keys:
+        try:
+            genai.configure(api_key=key)
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            response = model.generate_content(prompt)
+
+            return response.text
+
+        except Exception as e:
+            last_error = e
+            continue  # 다음 Key로 retry
+
+    return f"❌ LLM 분석 실패: 모든 API Key 요청 실패\n마지막 오류: {last_error}"
 
 
 class WorldCupManager:
