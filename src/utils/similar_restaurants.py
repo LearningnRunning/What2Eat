@@ -53,7 +53,7 @@ class SimilarRestaurantFetcher:
         try:
             # Redis에서 유사 식당 ID 리스트 가져오기
             key = f"diner:{diner_idx}:similar_diner_ids"
-            response = requests.post(self.api_url + "/api/v1/redis/read", json={"keys": [key]}, timeout=3)
+            response = requests.post(self.api_url + "/redis/read", json={"keys": [key]}, timeout=3)
             if response.status_code != 200:
                 return []
             
@@ -66,7 +66,6 @@ class SimilarRestaurantFetcher:
                 restaurant_info = self._fetch_restaurant_from_api(kakao_place_id, user_lat, user_lon)
                 if restaurant_info:
                     restaurants.append(restaurant_info)
-            
             return restaurants
             
         except Exception as e:
@@ -178,6 +177,4 @@ class SimilarRestaurantFetcher:
         }
 
 
-def get_similar_restaurant_fetcher() -> SimilarRestaurantFetcher:
-    """SimilarRestaurantFetcher 인스턴스 반환"""
-    return SimilarRestaurantFetcher()
+SimilarRestaurantFetcher()

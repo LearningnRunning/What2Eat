@@ -11,7 +11,7 @@ from utils.api import APIRequester
 from utils.auth import get_current_user
 from utils.data_processing import get_filtered_data
 from utils.firebase_logger import get_firebase_logger
-from utils.similar_restaurants import get_similar_restaurant_fetcher
+from utils.similar_restaurants import SimilarRestaurantFetcher
 
 
 class OnboardingManager:
@@ -22,7 +22,7 @@ class OnboardingManager:
         self.app = app
         # 유사 식당 fetcher 초기화
         if app and hasattr(app, "df_diner"):
-            self.similar_fetcher = get_similar_restaurant_fetcher()
+            self.similar_fetcher = SimilarRestaurantFetcher()
         else:
             self.similar_fetcher = None
         self.api_requester = APIRequester(endpoint=st.secrets["API_URL"])
