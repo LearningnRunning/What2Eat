@@ -7,9 +7,11 @@ import pandas as pd
 import streamlit as st
 from firebase_admin import firestore
 
+from utils.api import APIRequester
 from utils.auth import get_current_user
 from utils.data_processing import get_filtered_data
 from utils.firebase_logger import get_firebase_logger
+from utils.similar_restaurants import SimilarRestaurantFetcher
 
 
 class OnboardingManager:
@@ -18,6 +20,12 @@ class OnboardingManager:
     def __init__(self, app=None):
         self.logger = get_firebase_logger()
         self.app = app
+        # 유사 식당 fetcher 초기화
+        if app and hasattr(app, "df_diner"):
+            self.similar_fetcher = SimilarRestaurantFetcher()
+        else:
+            self.similar_fetcher = None
+        self.api_requester = APIRequester(endpoint=st.secrets["API_URL"])
 
     def get_popular_restaurants_by_location(
         self, location: str, limit: int = 10
@@ -230,105 +238,26 @@ class OnboardingManager:
         return len(df_quality)
 
     def get_similar_restaurants(
-        self, restaurant_id: str, limit: int = 3
+        self, restaurant_id: str, limit: int = 3, use_item_cf: bool = True
     ) -> List[Dict[str, Any]]:
-        """유사 음식점 조회 (같은 diner_category_large, diner_grade 높은 순)"""
-        if not self.app or not hasattr(self.app, "df_diner"):
+        """
+        유사 음식점 조회
+        
+        Args:
+            restaurant_id: 기준 식당 ID
+            limit: 반환할 최대 개수
+            use_item_cf: True면 API 사용, False면 카테고리 기반
+        """
+        if not self.similar_fetcher:
             return []
-
-        # 현재 사용자 위치 정보 가져오기
-        if "user_lat" not in st.session_state or "user_lon" not in st.session_state:
-            return []
-
-        user_lat = st.session_state.user_lat
-        user_lon = st.session_state.user_lon
-
-        # 선택된 음식점 정보 찾기
-        try:
-            selected_restaurant = self.app.df_diner[
-                self.app.df_diner["diner_idx"].astype(str) == restaurant_id
-            ]
-
-            if len(selected_restaurant) == 0:
-                return []
-
-            selected_category = selected_restaurant.iloc[0]["diner_category_large"]
-
-        except Exception:
-            return []
-
-        # 2km 반경 내 데이터 필터링
-        df_geo_filtered = get_filtered_data(
-            self.app.df_diner, user_lat, user_lon, max_radius=10
+        
+        return self.similar_fetcher.get_similar_restaurants(
+            diner_idx=int(restaurant_id),
+            user_lat=st.session_state.get("user_lat"),
+            user_lon=st.session_state.get("user_lon"),
+            use_item_cf=use_item_cf,
+            limit=limit
         )
-
-        # 같은 카테고리의 음식점만 필터링
-        df_same_category = df_geo_filtered[
-            df_geo_filtered["diner_category_large"] == selected_category
-        ]
-
-        # 선택된 음식점 제외
-        df_same_category = df_same_category[
-            df_same_category["diner_idx"].astype(str) != restaurant_id
-        ]
-
-        # diner_grade가 있는 데이터만 필터링
-        df_same_category = df_same_category[df_same_category["diner_grade"].notna()]
-
-        # diner_grade가 1 이상인 찐맛집만 필터링
-        df_quality = df_same_category[df_same_category["diner_grade"] >= 1]
-
-        if len(df_quality) == 0:
-            return []
-
-        # diner_grade 높은 순으로 정렬
-        df_sorted = df_quality.sort_values(by="diner_grade", ascending=False)
-
-        # limit 개수만큼 선택
-        df_selected = df_sorted.head(limit).copy()
-        df_selected["diner_review_cnt"] = df_selected["diner_review_cnt"].fillna(0)
-
-        # 결과를 딕셔너리 리스트로 변환
-        similar_restaurants = []
-        for _, row in df_selected.iterrows():
-            # NaN 값 안전하게 처리
-            review_count = row.get("diner_review_cnt", 0)
-            if pd.isna(review_count):
-                review_count = 0
-            else:
-                review_count = int(review_count)
-
-            diner_grade = row.get("diner_grade", 0)
-            if pd.isna(diner_grade):
-                diner_grade = 0.0
-            else:
-                diner_grade = float(diner_grade)
-
-            distance = row.get("distance", 0)
-            if pd.isna(distance):
-                distance = 0.0
-            else:
-                distance = round(float(distance), 1)
-
-            # diner_menu_name 처리 - list 타입이면 문자열로 변환
-            specialties = row.get("diner_menu_name", [])
-            if isinstance(specialties, list):
-                specialties = specialties[:2]
-            else:
-                specialties = []
-
-            restaurant = {
-                "id": str(row.get("diner_idx", "")),
-                "name": row.get("diner_name", ""),
-                "category": row.get("diner_category_large", ""),
-                "rating": diner_grade,
-                "specialties": specialties,
-                "distance": distance,
-                "review_count": review_count,
-            }
-            similar_restaurants.append(restaurant)
-
-        return similar_restaurants
 
     def save_user_profile(
         self, profile_data: Dict[str, Any], ratings_data: Dict[str, int]
@@ -535,7 +464,7 @@ class OnboardingManager:
         errors = []
 
         # 필수 프로필 정보 확인
-        required_fields = ["location", "birth_year", "gender", "regular_budget"]
+        required_fields = ["location"]
         for field in required_fields:
             if not profile_data.get(field):
                 errors.append(f"{field} 정보가 누락되었습니다.")
@@ -547,16 +476,8 @@ class OnboardingManager:
 
         # 평가 개수 확인
         rated_count = len([r for r in ratings_data.values() if r > 0])
-        if rated_count < 3:  # 최소 3개 평가 필요
-            errors.append(f"최소 3개 음식점 평가가 필요합니다. (현재: {rated_count}개)")
-
-        # 연령 유효성 확인
-        birth_year = profile_data.get("birth_year")
-        if birth_year:
-            current_year = datetime.now().year
-            age = current_year - birth_year
-            if age < 10 or age > 100:
-                errors.append("올바른 출생연도를 입력해주세요.")
+        if rated_count < 5:  # 최소 5개 평가 필요
+            errors.append(f"최소 5개 음식점 평가가 필요합니다. (현재: {rated_count}개)")
 
         return errors
 

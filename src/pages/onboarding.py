@@ -327,17 +327,15 @@ class OnboardingPage:
         elif st.session_state.onboarding_step == 1:
             self._render_location_step()
         elif st.session_state.onboarding_step == 2:
-            self._render_basic_info_step()
-        elif st.session_state.onboarding_step == 3:
             self._render_taste_preferences_step()
-        elif st.session_state.onboarding_step == 4:
+        elif st.session_state.onboarding_step == 3:
             self._render_restaurant_rating_step()
-        elif st.session_state.onboarding_step == 5:
+        elif st.session_state.onboarding_step == 4:
             self._render_completion_step()
 
     def _render_progress_bar(self):
         """진행 상태 바 렌더링"""
-        steps = ["환영", "위치", "기본정보", "취향", "평가", "완료"]
+        steps = ["환영", "위치", "취향", "평가", "완료"]
         current_step = st.session_state.onboarding_step
 
         # 진행률 계산
@@ -358,11 +356,9 @@ class OnboardingPage:
         **넷플릭스에서 영화를, 스포티파이에서 음악을 추천받듯이**  
         What2Eat에서는 당신만의 맛집을 추천해드려요! 🍽️
         
-        #### 📝 설정 과정 (약 3-5분 소요)
+        #### 📝 설정 과정 (약 1분 내외 소요)
         1. **위치 정보** - 주로 방문하는 지역
-        2. **기본 정보** - 연령, 성별, 식사 스타일
-        3. **취향 정보** - 매운맛 정도, 알러지 등
-        4. **음식점 평가** - 몇 개 음식점에 대한 평가
+        2. **음식점 평가** - 최소 5개 음식점에 대한 평가 (1점 ~ 5점)
         
         설정을 완료하면 당신만을 위한 **개인화된 맛집 추천**을 받을 수 있어요!
         """)
@@ -376,8 +372,8 @@ class OnboardingPage:
         st.markdown("# 📍 주로 어디서 식사하시나요?")
 
         st.markdown("""
-        맛집 추천을 위해 주로 방문하시는 지역을 알려주세요.  
-        현재 위치 또는 자주 가시는 동네를 입력해주시면 됩니다.
+        방문하셨던 음식점을 조사하기 위해 주요 활동 지역을 알려주세요.
+        현재 위치 또는 자주 가시는 동네(거주지, 직장 근처 등)를 입력해주시면 됩니다.
         """)
 
         # 기존 geolocation 함수들을 활용하여 위치를 설정합니다.
@@ -490,50 +486,6 @@ class OnboardingPage:
 
     def _render_taste_preferences_step(self):
         """취향 정보 수집 단계"""
-        st.markdown("# 🌶️ 취향 정보를 알려주세요")
-
-        # 매운맛 정도
-        st.markdown("### 매운맛은 어느 정도까지 드실 수 있나요?")
-
-        spice_levels = {
-            0: "매운맛을 못 먹어요",
-            1: "진라면 순한맛 정도 (1단)",
-            2: "신라면 정도 (2단)",
-            3: "틈새라면 정도 (3단)",
-            4: "불닭볶음면 정도 (4단)",
-            5: "그보다 더 매운 것도 좋아요 (5단 이상)",
-        }
-
-        spice_level = st.select_slider(
-            "매운맛 단계",
-            options=list(spice_levels.keys()),
-            format_func=lambda x: spice_levels[x],
-            value=st.session_state.user_profile.get("spice_level", 2),
-        )
-        st.session_state.user_profile["spice_level"] = spice_level
-
-        # 알러지 정보
-        st.markdown("### 🚫 알러지나 못 드시는 음식이 있나요?")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            allergies = st.text_area(
-                "알러지 정보",
-                placeholder="예: 새우, 견과류, 갑각류 등",
-                value=st.session_state.user_profile.get("allergies", ""),
-                height=100,
-            )
-            st.session_state.user_profile["allergies"] = allergies
-
-        with col2:
-            dislikes = st.text_area(
-                "못 드시는 음식",
-                placeholder="예: 생선, 양념치킨, 파 등",
-                value=st.session_state.user_profile.get("dislikes", ""),
-                height=100,
-            )
-            st.session_state.user_profile["dislikes"] = dislikes
-
         # 선호하는 음식 유형
         st.markdown("### 🍽️ 어떤 음식을 주로 좋아하시나요?")
 
@@ -627,7 +579,7 @@ class OnboardingPage:
         st.session_state.user_profile["food_preferences"] = selected_large
 
         # 다음 단계 버튼
-        self._render_navigation_buttons(2, 4)
+        self._render_navigation_buttons(1, 3)
 
     def _render_restaurant_rating_step(self):
         """음식점 평가 단계"""
@@ -758,14 +710,15 @@ class OnboardingPage:
                         )
                         similar_restaurants = (
                             self.onboarding_manager.get_similar_restaurants(
-                                restaurant["id"]
+                                restaurant["id"],
+                                limit=3,
+                                use_item_cf=True
                             )
                         )
-
                         for idx, similar in enumerate(similar_restaurants):
                             # 유사 음식점 정보 표시
                             with st.expander(
-                                f"🔗 {similar['name']} - {similar['category']}",
+                                f"🔗 {similar['name']}",
                                 expanded=False,
                             ):
                                 col1, col2 = st.columns([1, 2])
@@ -823,7 +776,6 @@ class OnboardingPage:
                 location, preferred_categories
             )
             current_count = len(st.session_state.loaded_restaurants)
-
             if current_count < total_count:
                 if st.button(
                     f"🔍 더 많은 음식점 보기 ({current_count}/{total_count})",
@@ -844,7 +796,6 @@ class OnboardingPage:
                                 location, limit=10
                             )
                         )
-
                     if new_restaurants:
                         st.session_state.loaded_restaurants.extend(new_restaurants)
                         st.session_state.restaurants_offset += len(new_restaurants)
@@ -880,8 +831,8 @@ class OnboardingPage:
 
         # 다음 단계 버튼
         self._render_navigation_buttons(
-            3,
-            5,
+            2,
+            4,
             next_condition=st.session_state.total_rated_count
             >= self.min_ratings_required,
             next_label="완료 ▶",
@@ -922,33 +873,16 @@ class OnboardingPage:
         """)
 
         # 설정 정보 요약
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             st.markdown("**📍 위치 정보**")
             st.write(
                 f"• 주요 지역: {st.session_state.user_profile.get('location', '미설정')}"
             )
-
-            st.markdown("**👤 기본 정보**")
-            # TODO: 연령대 계산 방법 수정
-            st.write(
-                f"• 연령대: {2025 - st.session_state.user_profile.get('birth_year', 2000)}세"
-            )
-            st.write(f"• 성별: {st.session_state.user_profile.get('gender', '미설정')}")
-            st.write(
-                f"• 동행 스타일: {', '.join(st.session_state.user_profile.get('dining_companions', []))}"
-            )
-
+        
         with col2:
-            st.markdown("**🌶️ 취향 정보**")
-            st.write(
-                f"• 매운맛 단계: {st.session_state.user_profile.get('spice_level', 0)}단"
-            )
-            st.write(
-                f"• 평소 식사비: {st.session_state.user_profile.get('regular_budget', '미설정')}"
-            )
-
+            st.markdown("**🍙 취향 정보**")
             # 선호 음식 카테고리 표시
             large_prefs = st.session_state.user_profile.get(
                 "food_preferences_large", []
@@ -967,7 +901,8 @@ class OnboardingPage:
                             st.write(f"  - {large_cat}: {', '.join(middle_list)}")
             else:
                 st.write("• 선호 음식 종류: 미설정")
-
+        
+        with col3:
             st.markdown("**⭐ 평가 정보**")
             rated_count = sum(
                 1
@@ -975,8 +910,12 @@ class OnboardingPage:
                 if rating > 0
             )
             st.write(f"• 평가한 음식점: {rated_count}개")
+            for key, rating in st.session_state.restaurant_ratings.items():
+                diner_id = key.split("_")[-1]
+                diner_name = self._get_diner_name(diner_id)
+                st.write(f"• {diner_name} 식당에 {rating}점을 주셨어요.")
 
-            # 평가 유형별 통계 (캐시된 값 사용)
+        # 평가 유형별 통계 (캐시된 값 사용)
         if "rating_stats" not in st.session_state:
             st.session_state.rating_stats = {"regular": 0, "search": 0, "similar": 0}
 
@@ -1004,17 +943,6 @@ class OnboardingPage:
         # 변경사항이 있을 때만 업데이트
         if current_stats != st.session_state.rating_stats:
             st.session_state.rating_stats = current_stats
-
-        regular_ratings = st.session_state.rating_stats["regular"]
-        search_ratings = st.session_state.rating_stats["search"]
-        similar_ratings = st.session_state.rating_stats["similar"]
-
-        if regular_ratings > 0:
-            st.write(f"  - 추천 음식점: {regular_ratings}개")
-        if search_ratings > 0:
-            st.write(f"  - 검색 음식점: {search_ratings}개")
-        if similar_ratings > 0:
-            st.write(f"  - 유사 음식점: {similar_ratings}개")
 
         # 데이터 저장
         if st.button("🚀 What2Eat 시작하기!", use_container_width=True, type="primary"):
@@ -1089,3 +1017,8 @@ class OnboardingPage:
                     "onboarding_completed",
                     {"profile_data": st.session_state.user_profile},
                 )
+    
+    def _get_diner_name(self, diner_id: str) -> str:
+        # call GET /kakao/diners/{diner_id} API
+        response = self.api_requester.get(api_path=f"/kakao/diners/{diner_id}").json()
+        return response["diner_name"]

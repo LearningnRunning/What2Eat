@@ -10,7 +10,7 @@ from utils.data_processing import grade_to_stars, safe_item_access
 from utils.firebase_logger import get_firebase_logger
 
 
-@st.cache_data
+@st.cache_data(hash_funcs={pd.DataFrame: lambda _: None})
 def choice_avatar():
     avatar_style_list = [
         "avataaars",
