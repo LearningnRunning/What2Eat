@@ -710,14 +710,15 @@ class OnboardingPage:
                         )
                         similar_restaurants = (
                             self.onboarding_manager.get_similar_restaurants(
-                                restaurant["id"]
+                                restaurant["id"],
+                                limit=3,
+                                use_item_cf=True
                             )
                         )
-
                         for idx, similar in enumerate(similar_restaurants):
                             # 유사 음식점 정보 표시
                             with st.expander(
-                                f"🔗 {similar['name']} - {similar['category']}",
+                                f"🔗 {similar['name']}",
                                 expanded=False,
                             ):
                                 col1, col2 = st.columns([1, 2])
@@ -775,7 +776,6 @@ class OnboardingPage:
                 location, preferred_categories
             )
             current_count = len(st.session_state.loaded_restaurants)
-
             if current_count < total_count:
                 if st.button(
                     f"🔍 더 많은 음식점 보기 ({current_count}/{total_count})",
@@ -796,7 +796,6 @@ class OnboardingPage:
                                 location, limit=10
                             )
                         )
-
                     if new_restaurants:
                         st.session_state.loaded_restaurants.extend(new_restaurants)
                         st.session_state.restaurants_offset += len(new_restaurants)
