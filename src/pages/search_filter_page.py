@@ -4,11 +4,10 @@
 import pandas as pd
 import streamlit as st
 
-from config.constants import LARGE_CATEGORIES, LARGE_CATEGORIES_NOT_USED
 from pages import search_map_page
 from utils.api import APIRequester
 from utils.app import What2EatApp
-from utils.auth import get_user_personalization_status
+from utils.auth import get_current_user, get_user_personalization_status
 from utils.dialogs import change_location
 from utils.firebase_logger import get_firebase_logger
 from utils.search_filter import SearchFilter
@@ -48,10 +47,10 @@ def initialize_session_state():
         st.session_state.filter_cache_key = None
     if "total_results_count" not in st.session_state:
         st.session_state.total_results_count = 0
-    if "filtered_distance_dict" not in st.session_state:
-        st.session_state.filtered_distance_dict = {}
-    if "filtered_distance_dict_all" not in st.session_state:
-        st.session_state.filtered_distance_dict_all = {}  # 30km 범위의 전체 거리 데이터
+    if "filtered_distance_id_mapping" not in st.session_state:
+        st.session_state.filtered_distance_id_mapping = {}
+    if "filtered_distance_id_mapping_all" not in st.session_state:
+        st.session_state.filtered_distance_id_mapping_all = {}  # 30km 범위의 전체 거리 데이터
 
 
 def render_filter_ui(app: What2EatApp, search_filter: SearchFilter):
@@ -72,54 +71,54 @@ def render_filter_ui(app: What2EatApp, search_filter: SearchFilter):
 
     st.markdown("---")
 
-    # 카테고리 선택 (폼 외부 - 동적 업데이트를 위해)
-    st.markdown("### 🍽️ 카테고리")
+    # # 카테고리 선택 (폼 외부 - 동적 업데이트를 위해)
+    # st.markdown("### 🍽️ 카테고리")
 
-    # 대분류 카테고리
-    large_categories = [cat for cat in LARGE_CATEGORIES if cat not in LARGE_CATEGORIES_NOT_USED]
-    selected_large = st.multiselect(
-        "대분류 카테고리",
-        options=large_categories,
-        default=st.session_state.search_filters["large_categories"],
-        help="대분류를 선택하면 해당하는 중분류만 표시됩니다",
-        key="large_category_filter"
-    )
+    # # 대분류 카테고리
+    # large_categories = [cat for cat in LARGE_CATEGORIES if cat not in LARGE_CATEGORIES_NOT_USED]
+    # selected_large = st.multiselect(
+    #     "대분류 카테고리",
+    #     options=large_categories,
+    #     default=st.session_state.search_filters["large_categories"],
+    #     help="대분류를 선택하면 해당하는 중분류만 표시됩니다",
+    #     key="large_category_filter"
+    # )
 
-    # 중분류 카테고리 (대분류 선택에 따라 동적으로 필터링)
-    if selected_large:
-        df_filtered_by_large = app.df_diner[
-            app.df_diner["diner_category_large"].isin(selected_large)
-        ]
-        middle_categories = sorted(
-            df_filtered_by_large["diner_category_middle"].dropna().unique()
-        )
-        
-        # 이전에 선택된 중분류 중 현재 대분류에 해당하는 것만 유지
-        valid_middle_defaults = [
-            cat
-            for cat in st.session_state.search_filters["middle_categories"]
-            if cat in middle_categories
-        ]
-        
-        selected_middle = st.multiselect(
-            "중분류 카테고리",
-            options=middle_categories,
-            default=valid_middle_defaults,
-            help=f"{len(middle_categories)}개의 중분류 카테고리 사용 가능",
-            key="middle_category_filter"
-        )
-    else:
-        # 대분류가 선택되지 않은 경우 빈 목록 표시
-        selected_middle = st.multiselect(
-            "중분류 카테고리",
-            options=[],
-            default=[],
-            disabled=True,
-            help="먼저 대분류 카테고리를 선택해주세요",
-            key="middle_category_filter"
-        )
+    # # 중분류 카테고리 (대분류 선택에 따라 동적으로 필터링)
+    # if selected_large:
+    #     df_filtered_by_large = app.df_diner[
+    #         app.df_diner["diner_category_large"].isin(selected_large)
+    #     ]
+    #     middle_categories = sorted(
+    #         df_filtered_by_large["diner_category_middle"].dropna().unique()
+    #     )
 
-    st.markdown("---")
+    #     # 이전에 선택된 중분류 중 현재 대분류에 해당하는 것만 유지
+    #     valid_middle_defaults = [
+    #         cat
+    #         for cat in st.session_state.search_filters["middle_categories"]
+    #         if cat in middle_categories
+    #     ]
+
+    #     selected_middle = st.multiselect(
+    #         "중분류 카테고리",
+    #         options=middle_categories,
+    #         default=valid_middle_defaults,
+    #         help=f"{len(middle_categories)}개의 중분류 카테고리 사용 가능",
+    #         key="middle_category_filter"
+    #     )
+    # else:
+    #     # 대분류가 선택되지 않은 경우 빈 목록 표시
+    #     selected_middle = st.multiselect(
+    #         "중분류 카테고리",
+    #         options=[],
+    #         default=[],
+    #         disabled=True,
+    #         help="먼저 대분류 카테고리를 선택해주세요",
+    #         key="middle_category_filter"
+    #     )
+
+    # st.markdown("---")
 
     # 폼으로 나머지 필터 감싸기
     with st.form("search_filter_form", clear_on_submit=False):
@@ -264,6 +263,9 @@ def render_restaurant_dataframe(df_results, total_count=None):
     if sort_by == "숨찐맛":
         col4_label = "숨찐맛 점수"
         col5_label = "거리"
+    elif sort_by == "개인화":
+        col4_label = "개인화 점수"
+        col5_label = "거리"
     elif sort_by == "인기도":
         col4_label = "인기도 점수"
         col5_label = "거리"
@@ -294,7 +296,6 @@ def render_restaurant_dataframe(df_results, total_count=None):
     # 각 음식점을 개별 행으로 렌더링하여 클릭 감지 가능하게 만들기
     from utils.activity_logger import get_activity_logger
 
-    print(f"df_display: {len(df_display)}")
     for list_idx, (df_idx, row) in enumerate(df_display.iterrows()):
         diner_idx = row["diner_idx"]
         diner_name = row["diner_name"]
@@ -322,6 +323,11 @@ def render_restaurant_dataframe(df_results, total_count=None):
             elif sort_by == "인기도":
                 if "bayesian_score" in row and pd.notna(row["bayesian_score"]):
                     st.write(f"{row['bayesian_score']:.2f}")
+                else:
+                    st.write("-")
+            elif sort_by == "개인화":
+                if "personalized_score" in row and pd.notna(row["personalized_score"]):
+                    st.write(f"{row['personalized_score']:.2f}")
                 else:
                     st.write("-")
             else:  # 개인화 또는 기본값
@@ -388,37 +394,59 @@ def render_restaurant_dataframe(df_results, total_count=None):
                 if "user_info" in st.session_state and st.session_state.user_info:
                     user_id = st.session_state.user_info.get("localId")
 
-                diner_ids = st.session_state.filtered_restaurant_ids
+                # 개인화인 경우와 아닌 경우를 구분하여 처리
+                if filters["sort_by"] == "개인화":
+                    # 개인화인 경우: 세션에 저장된 전체 정렬된 결과에서 다음 페이지 가져오기
+                    if "personalized_all_results" in st.session_state:
+                        personalized_all = st.session_state.personalized_all_results
+                        next_page_results = personalized_all.iloc[
+                            current_display_count : current_display_count + 15
+                        ].copy()
 
-                # 다음 페이지 가져오기 (현재까지 표시한 개수를 offset으로 사용)
-                next_page_results = search_filter.sort_restaurants(
-                    diner_ids=diner_ids,
-                    sort_by=filters["sort_by"],
-                    user_lat=st.session_state.user_lat,
-                    user_lon=st.session_state.user_lon,
-                    user_id=user_id,
-                    limit=15,
-                    offset=current_display_count,
-                )
-
-                if next_page_results is not None and len(next_page_results) > 0:
-                    # 거리값 매핑
-                    if (
-                        "id" in next_page_results.columns
-                        and "filtered_distance_dict" in st.session_state
-                    ):
-                        next_page_results["distance"] = next_page_results["id"].map(
-                            st.session_state.filtered_distance_dict
-                        )
-
-                    # 기존 결과에 추가
-                    st.session_state.search_results = pd.concat(
-                        [st.session_state.search_results, next_page_results],
-                        ignore_index=True,
-                    )
-                    st.session_state.search_display_count += 15
+                        if len(next_page_results) > 0:
+                            # 기존 결과에 추가
+                            st.session_state.search_results = pd.concat(
+                                [st.session_state.search_results, next_page_results],
+                                ignore_index=True,
+                            )
+                            st.session_state.search_display_count += 15
+                        else:
+                            st.warning("더 이상 표시할 결과가 없습니다.")
+                    else:
+                        st.warning("개인화 결과를 찾을 수 없습니다.")
                 else:
-                    st.warning("더 이상 표시할 결과가 없습니다.")
+                    # 개인화가 아닌 경우: 기존 로직 사용
+                    diner_ids = st.session_state.filtered_restaurant_ids
+
+                    # 다음 페이지 가져오기 (현재까지 표시한 개수를 offset으로 사용)
+                    next_page_results = search_filter.sort_restaurants(
+                        diner_ids=diner_ids,
+                        sort_by=filters["sort_by"],
+                        user_lat=st.session_state.user_lat,
+                        user_lon=st.session_state.user_lon,
+                        user_id=user_id,
+                        limit=15,
+                        offset=current_display_count,
+                    )
+
+                    if next_page_results is not None and len(next_page_results) > 0:
+                        # 거리값 매핑
+                        if (
+                            "id" in next_page_results.columns
+                            and "filtered_distance_dict" in st.session_state
+                        ):
+                            next_page_results["distance"] = next_page_results["id"].map(
+                                st.session_state.filtered_distance_dict
+                            )
+
+                        # 기존 결과에 추가
+                        st.session_state.search_results = pd.concat(
+                            [st.session_state.search_results, next_page_results],
+                            ignore_index=True,
+                        )
+                        st.session_state.search_display_count += 15
+                    else:
+                        st.warning("더 이상 표시할 결과가 없습니다.")
                 st.rerun()
     else:
         st.success(f"✅ 모든 {total_count}개 음식점을 표시했습니다.")
@@ -478,28 +506,45 @@ def render():
             )
 
             if filter_changed:
+                # 필터가 변경되면 개인화 결과 초기화
+                if "personalized_all_results" in st.session_state:
+                    del st.session_state.personalized_all_results
+
                 # 필터링 API 호출 (30km로 고정하여 더 많은 데이터 가져오기)
-                diner_ids, distance_dict = search_filter.get_filtered_restaurants(
-                    user_lat=st.session_state.user_lat,
-                    user_lon=st.session_state.user_lon,
-                    radius_km=api_radius_km,  # 30으로 고정
-                    large_categories=filters["large_categories"]
-                    if filters["large_categories"]
-                    else None,
-                    middle_categories=filters["middle_categories"]
-                    if filters["middle_categories"]
-                    else None,
+                diner_ids, diner_idx, distance_dict, distance_dict_idx = (
+                    search_filter.get_filtered_restaurants(
+                        user_lat=st.session_state.user_lat,
+                        user_lon=st.session_state.user_lon,
+                        radius_km=api_radius_km,  # 30으로 고정
+                        large_categories=filters["large_categories"]
+                        if filters["large_categories"]
+                        else None,
+                        middle_categories=filters["middle_categories"]
+                        if filters["middle_categories"]
+                        else None,
+                    )
                 )
 
                 if diner_ids is not None and len(diner_ids) > 0:
                     # 전체 데이터를 캐시에 저장 (30km 범위의 모든 데이터)
                     st.session_state.filtered_restaurant_ids_all = diner_ids
-                    st.session_state.filtered_distance_dict_all = distance_dict or {}
+                    st.session_state.filtered_restaurant_idx_all = diner_idx
+                    st.session_state.filtered_distance_id_mapping_all = (
+                        distance_dict or {}
+                    )
+                    st.session_state.filtered_distance_idx_mapping_all = (
+                        distance_dict_idx or {}
+                    )
                     st.session_state.filter_cache_key = current_cache_key
                 else:
                     st.error("❌ 필터링된 음식점을 가져올 수 없습니다.")
                     return
-
+            diner_id_to_idx = dict(
+                zip(
+                    st.session_state.filtered_restaurant_ids_all,
+                    st.session_state.filtered_restaurant_idx_all,
+                )
+            )
             # 클라이언트 사이드에서 사용자가 선택한 반경으로 필터링
             user_radius_km = filters["radius_km"]
 
@@ -511,53 +556,139 @@ def render():
             filtered_diner_ids = [
                 diner_id
                 for diner_id in st.session_state.filtered_restaurant_ids_all
-                if st.session_state.filtered_distance_dict_all.get(
+                if st.session_state.filtered_distance_id_mapping_all.get(
                     diner_id, float("inf")
                 )
                 <= user_radius_km
             ]
-            filtered_distance_dict = {
-                diner_id: distance
-                for diner_id, distance in st.session_state.filtered_distance_dict_all.items()
-                if distance <= user_radius_km
+            filtered_diner_idx = [
+                diner_id_to_idx[diner_id] for diner_id in filtered_diner_ids
+            ]
+            filtered_distance_id_mapping = {
+                diner_id: st.session_state.filtered_distance_id_mapping_all[diner_id]
+                for diner_id in filtered_diner_ids
+            }
+            filtered_distance_idx_mapping = {
+                diner_id_to_idx[
+                    diner_id
+                ]: st.session_state.filtered_distance_id_mapping_all[diner_id]
+                for diner_id in filtered_diner_ids
             }
 
             # 필터링된 결과 사용
             diner_ids = filtered_diner_ids
+            diner_idx = filtered_diner_idx
             st.session_state.filtered_restaurant_ids = filtered_diner_ids
-            st.session_state.filtered_distance_dict = filtered_distance_dict
-
-            # 정렬 API 호출 (페이지네이션: 처음 15개만)
-            user_id = None
-            if "user_info" in st.session_state and st.session_state.user_info:
-                user_id = st.session_state.user_info.get("localId")
+            st.session_state.filtered_restaurant_idx = filtered_diner_idx
+            st.session_state.filtered_distance_id_mapping = filtered_distance_id_mapping
+            st.session_state.filtered_distance_idx_mapping = (
+                filtered_distance_idx_mapping
+            )
 
             # 전체 결과 개수 저장
             st.session_state.total_results_count = len(diner_ids)
 
-            # 첫 페이지만 가져오기
-            df_results = search_filter.sort_restaurants(
-                diner_ids=diner_ids,
-                sort_by=filters["sort_by"],
-                user_lat=st.session_state.user_lat,
-                user_lon=st.session_state.user_lon,
-                user_id=user_id,
-                limit=15,
-                offset=0,
-            )
+            # 개인화는 한번에 가져와서 표출할 때에 페이지네이션을 한다.
+            if filters["sort_by"] == "개인화":
+                # 개인화 정렬: API를 직접 호출하여 개인화된 순서로 재정렬
+                firebase_uid = get_current_user()["localId"]
+
+                try:
+                    all_df_results = search_filter.apply_filters(
+                        user_lat=st.session_state.user_lat,
+                        user_lon=st.session_state.user_lon,
+                        radius_km=filters["radius_km"],
+                        large_categories=filters["large_categories"]
+                        if filters["large_categories"]
+                        else None,
+                        middle_categories=filters["middle_categories"]
+                        if filters["middle_categories"]
+                        else None,
+                        sort_by=filters["sort_by"],
+                    )
+                    diner_idx_list = all_df_results["diner_idx"].tolist()
+
+                    if all_df_results is not None and len(all_df_results) > 0:
+                        # Call personal recommendation API
+                        api = APIRequester(endpoint=st.secrets["API_URL"])
+                        response = api.post(
+                            "/rec/personal",
+                            data={
+                                "diner_ids": diner_idx_list,
+                                "firebase_uid": firebase_uid,
+                            },
+                        ).json()
+
+                        personalized_diner_ids = response["diner_ids"]
+                        personalized_scores = response["scores"]
+
+                        # Handle case where response has fewer items than original
+                        if len(personalized_diner_ids) < len(diner_idx_list):
+                            # Get remaining diner_ids not in personalized response
+                            # These diners are **cold-start** diners, not in train data
+                            remaining_ids = [
+                                id
+                                for id in diner_idx_list
+                                if id not in personalized_diner_ids
+                            ]
+                            # Combine personalized + remaining in original order
+                            final_diner_ids = personalized_diner_ids + remaining_ids
+                            scores = personalized_scores + ["NA"] * len(remaining_ids)
+                        else:
+                            final_diner_ids = personalized_diner_ids.copy()
+                            scores = personalized_scores.copy()
+
+                        # Reorder all_df_results based on personalized order
+                        all_df_results = (
+                            all_df_results.set_index("diner_idx")
+                            .reindex(final_diner_ids)
+                            .reset_index()
+                        )
+                        all_df_results["personalized_score"] = scores
+                        all_df_results["distance"] = all_df_results["id"].map(
+                            st.session_state.filtered_distance_id_mapping
+                        )
+                        # 전체 결과를 세션 상태에 저장 (페이지네이션을 위해)
+                        st.session_state.personalized_all_results = all_df_results
+                        # 전체 결과 개수 업데이트
+                        st.session_state.total_results_count = len(all_df_results)
+                        # 첫 페이지는 15개만 표시
+                        df_results = all_df_results[:15]
+
+                except Exception as e:
+                    st.warning(
+                        f"개인화 추천을 불러오는데 실패했습니다. 기본 정렬을 사용합니다: {e}"
+                    )
+                    # Fallback to default sorting
+                    df_results = search_filter.sort_restaurants(
+                        diner_ids=diner_ids,
+                        sort_by="인기도",
+                        limit=15,
+                        offset=0,
+                    )
+            else:
+                # 개인화가 아닌 경우: 기존 정렬 로직 사용
+                df_results = search_filter.sort_restaurants(
+                    diner_ids=diner_ids,
+                    sort_by=filters["sort_by"],
+                    limit=15,
+                    offset=0,
+                )
+
+                if (
+                    "id" in df_results.columns
+                    and "filtered_distance_id_mapping" in st.session_state
+                ):
+                    df_results["distance"] = df_results["id"].map(
+                        st.session_state.filtered_distance_id_mapping
+                    )
 
             if df_results is None:
                 st.error("❌ 음식점 정렬 중 오류가 발생했습니다.")
                 return
 
-            # 거리값 매핑 (filtered_distance_dict에서 가져오기)
-            if (
-                "id" in df_results.columns
-                and "filtered_distance_dict" in st.session_state
-            ):
-                df_results["distance"] = df_results["id"].map(
-                    st.session_state.filtered_distance_dict
-                )
+            # 거리값 매핑 (filtered_distance_id_mapping에서 가져오기)
+            # 개인화인 경우는 이미 거리 매핑을 완료했으므로 건너뜀
 
             # 결과 저장
             st.session_state.search_results = df_results

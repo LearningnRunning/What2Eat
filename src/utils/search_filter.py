@@ -56,7 +56,7 @@ class SearchFilter:
         large_categories: Optional[list[str]] = None,
         middle_categories: Optional[list[str]] = None,
         limit: Optional[int] = None,
-    ) -> tuple[Optional[list[str]], Optional[dict[str, float]]]:
+    ) -> tuple[Optional[list[str]], Optional[list[int]], Optional[dict[str, float]]]:
         """
         음식점 필터링 (지역/카테고리)
 
@@ -69,7 +69,7 @@ class SearchFilter:
             limit: 최대 결과 수
 
         Returns:
-            (음식점 ID 리스트, 거리 딕셔너리) 또는 (None, None)
+            (음식점 ID 리스트, diner_idx 리스트, 거리 딕셔너리) 또는 (None, None, None)
             거리 딕셔너리: {id: distance} 형식
         """
         try:
@@ -77,33 +77,30 @@ class SearchFilter:
             client = get_yamyam_ops_client()
             if not client:
                 st.error("❌ API 클라이언트를 초기화할 수 없습니다.")
-                return None, None
+                return None, None, None
 
             # 비동기 API 호출을 동기적으로 실행
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            result = loop.run_until_complete(
-                client.get_filtered_restaurants(
-                    user_lat=user_lat,
-                    user_lon=user_lon,
-                    radius_km=radius_km,
-                    large_categories=large_categories,
-                    middle_categories=middle_categories,
-                    limit=limit,
+            diner_ids, diner_idx, distance_dict, distance_dict_idx = (
+                loop.run_until_complete(
+                    client.get_filtered_restaurants(
+                        user_lat=user_lat,
+                        user_lon=user_lon,
+                        radius_km=radius_km,
+                        large_categories=large_categories,
+                        middle_categories=middle_categories,
+                        limit=limit,
+                    )
                 )
             )
             loop.close()
 
-            if not result:
-                return [], {}
-
-            # (diner_ids, distance_dict) 튜플 반환
-            diner_ids, distance_dict = result
-            return diner_ids, distance_dict
+            return diner_ids, diner_idx, distance_dict, distance_dict_idx
 
         except Exception as e:
             st.error(f"❌ 음식점 필터링 중 오류가 발생했습니다: {str(e)}")
-            return None, None
+            return None, None, None
 
     def sort_restaurants(
         self,
@@ -183,8 +180,7 @@ class SearchFilter:
         large_categories: Optional[list[str]] = None,
         middle_categories: Optional[list[str]] = None,
         sort_by: str = "인기도",
-        period: str = "전체",
-        limit: int = 100,
+        limit: Optional[int] = None,
     ) -> pd.DataFrame:
         """
         모든 필터 적용 (API 호출) [DEPRECATED]
@@ -196,7 +192,6 @@ class SearchFilter:
             large_categories: 대분류 카테고리 리스트
             middle_categories: 중분류 카테고리 리스트
             sort_by: 정렬 기준
-            period: 기간 (현재 미사용)
             limit: 최대 결과 수
 
         Returns:

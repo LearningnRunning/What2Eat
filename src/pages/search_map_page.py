@@ -117,7 +117,6 @@ def render_dialog():
                             if filters["middle_categories"]
                             else None,
                             sort_by=filters["sort_by"],
-                            period=filters["period"],
                         )
 
                         # 결과 저장

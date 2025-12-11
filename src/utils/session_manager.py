@@ -245,10 +245,6 @@ class SessionManager:
                 all_cookies.get(self.jwt_refresh_cookie_key) if all_cookies else None
             )
 
-            print("[쿠키 복원] 쿠키 로드 완료:")
-            print(f"  - JWT Access 토큰: {bool(jwt_access_token)}")
-            print(f"  - JWT Refresh 토큰: {bool(jwt_refresh_token)}")
-
             # JWT 토큰이 없으면 실패
             if not jwt_access_token:
                 print("[쿠키 복원] ❌ JWT Access 토큰이 없음")
@@ -303,9 +299,7 @@ class SessionManager:
 
         except Exception as e:
             print(f"[쿠키 복원] ❌ 예외 발생: {type(e).__name__}: {str(e)}")
-            import traceback
 
-            print(f"[쿠키 복원] 트레이스백: {traceback.format_exc()}")
             return False
 
     def _restore_from_session_state(self) -> bool:
@@ -342,9 +336,9 @@ class SessionManager:
                 print("[JWT 검증] ❌ 세션에 JWT 토큰이 없습니다")
                 return False
 
-            api_url = st.secrets.get("YAMYAM_OPS_API_URL")
+            api_url = st.secrets.get("API_URL")
             if not api_url:
-                print("[JWT 검증] ❌ YAMYAM_OPS_API_URL이 설정되지 않았습니다")
+                print("[JWT 검증] ❌ API_URL이 설정되지 않았습니다")
                 return False
 
             import requests
@@ -352,17 +346,7 @@ class SessionManager:
             url = f"{api_url.rstrip('/')}/auth/verify"
             payload = {"token": st.session_state.jwt_access_token}
 
-            print(f"[JWT 검증] 🔍 요청 시작: {url}")
-            print(
-                f"[JWT 검증] 토큰 길이: {len(st.session_state.jwt_access_token) if st.session_state.jwt_access_token else 0}"
-            )
-
             response = requests.post(url, json=payload, timeout=5)
-
-            print(f"[JWT 검증] 📥 응답 수신: status_code={response.status_code}")
-            print(
-                f"[JWT 검증] 응답 내용: {response.text[:200] if response.text else 'None'}"
-            )
 
             if response.status_code == 200:
                 data = response.json()
@@ -686,9 +670,7 @@ class SessionManager:
         except Exception as e:
             # 오류 발생 시 로그 기록 후 False 반환
             print(f"[인증 확인] ❌ 예외 발생: {type(e).__name__}: {str(e)}")
-            import traceback
 
-            print(f"[인증 확인] 트레이스백: {traceback.format_exc()}")
             return False
 
     def logout(self):

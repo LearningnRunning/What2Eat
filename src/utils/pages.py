@@ -527,7 +527,7 @@ class PageManager:
     def worldcup_page(self):
         # 페이지 방문 로그
         self._log_user_activity("page_visit", {"page_name": "worldcup"})
-        
+
         # WorldCupManager 사용
         worldcup_manager = get_worldcup_manager(self.app.df_diner)
         worldcup_manager.render_worldcup_page()

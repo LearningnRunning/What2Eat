@@ -46,21 +46,19 @@ class AuthManager:
                 
                 # JWT 토큰이 있으면 복원 시도
                 if jwt_token:
-                    print("[AuthManager] 쿠키에서 JWT 토큰 발견, 복원 시도")
+
                     # JWT 토큰을 세션 상태에 저장
                     st.session_state.jwt_access_token = jwt_token
                     
                     # JWT 토큰 검증 (내부에서 get_all() 호출하지 않도록 직접 검증)
                     if self.session_manager._verify_jwt_token_with_yamyam_ops():
                         st.session_state.is_authenticated = True
-                        print("[AuthManager] 쿠키 복원 성공")
-                        # 복원 성공 시 페이지 재실행 (한 번만)
+                         # 복원 성공 시 페이지 재실행 (한 번만)
                         if not st.session_state.get("_cookie_restore_rerun", False):
                             st.session_state._cookie_restore_rerun = True
                             st.rerun()
                     else:
-                        print("[AuthManager] 쿠키 복원 실패 (토큰 검증 실패), 쿠키 삭제")
-                        self.clear_auth_state()
+                         self.clear_auth_state()
                 else:
                     print("[AuthManager] 쿠키에 JWT 토큰 없음")
             except Exception as e:
@@ -354,17 +352,16 @@ class FirebaseAuth:
     def _get_jwt_tokens_from_yamyam_ops(self, firebase_id_token: str) -> Optional[Dict[str, Any]]:
         """yamyam-ops의 /login 엔드포인트를 호출하여 JWT 토큰 받기"""
         try:
-            api_url = st.secrets.get("YAMYAM_OPS_API_URL")
+            api_url = st.secrets.get("API_URL")
             if not api_url:
                 logger = get_firebase_logger()
                 logger.log_user_activity(
-                    None, "error", {"message": "YAMYAM_OPS_API_URL이 설정되지 않았습니다."}
+                    None, "error", {"message": "API_URL이 설정되지 않았습니다."}
                 )
                 return None
 
             url = f"{api_url.rstrip('/')}/auth/login"
             payload = {"firebase_token": firebase_id_token}
-            print('firebase_id_token', firebase_id_token)
             response = requests.post(url, json=payload, timeout=10)
             
             if response.status_code == 200:

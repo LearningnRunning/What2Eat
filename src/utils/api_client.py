@@ -101,7 +101,7 @@ class YamYamOpsClient:
             if not jwt_refresh_token:
                 return False
 
-            api_url = st.secrets.get("YAMYAM_OPS_API_URL")
+            api_url = st.secrets.get("API_URL")
             if not api_url:
                 return False
 
@@ -203,7 +203,7 @@ class YamYamOpsClient:
 
             except httpx.HTTPStatusError as e:
                 logger.error(
-                    f"HTTP 에러 (시도 {attempt + 1}/{max_retries}): {e.response.status_code} - {e.response.text}"
+                    f"HTTP 에러 (시도 {attempt + 1}/{max_retries}): {method} {url} - {e.response.status_code} - {e.response.text}"
                 )
                 if e.response.status_code == 409:  # Conflict (중복 사용자)
                     # 중복은 에러가 아니므로 응답 반환
@@ -328,7 +328,7 @@ class YamYamOpsClient:
         large_categories: Optional[list[str]] = None,
         middle_categories: Optional[list[str]] = None,
         limit: Optional[int] = None,
-    ) -> Optional[tuple[list[str], dict[str, float]]]:
+    ) -> tuple[list[str], list[int], dict[str, float]]:
         """
         음식점 필터링 (지역/카테고리)
 
@@ -341,8 +341,9 @@ class YamYamOpsClient:
             limit: 최대 결과 수
 
         Returns:
-            (diner_ids 리스트, 거리 딕셔너리) 튜플 또는 None
+            (diner_ids 리스트, diner_idx 리스트, 거리 딕셔너리) 튜플
             거리 딕셔너리: {id: distance} 형식
+            결과가 없을 경우: ([], [], {})
         """
         try:
             params = {
@@ -366,17 +367,21 @@ class YamYamOpsClient:
             )
 
             if not result:
-                return None
+                return ([], [], {})
 
             # diner_ids 리스트와 거리 딕셔너리 추출
             diner_ids = [item["id"] for item in result]
+            diner_idx = [item["diner_idx"] for item in result]
             distance_dict = {item["id"]: float(item["distance"]) for item in result}
+            distance_dict_idx = {
+                item["diner_idx"]: float(item["distance"]) for item in result
+            }
 
-            return (diner_ids, distance_dict)
+            return diner_ids, diner_idx, distance_dict, distance_dict_idx
 
         except Exception as e:
             logger.error(f"음식점 필터링 중 예외 발생: {e}")
-            return None
+            return ([], [], {})
 
     async def sort_restaurants(
         self,
@@ -442,11 +447,54 @@ class YamYamOpsClient:
             음식점 정보 또는 None
         """
         try:
-            result = await self._make_request("GET", f"/kakao/diners/{diner_idx}/")
+            result = await self._make_request("GET", f"/kakao/diners/{diner_idx}")
             return result
 
         except Exception as e:
             logger.error(f"음식점 상세 조회 중 예외 발생: {e}")
+            return None
+
+    async def search_restaurants(
+        self,
+        query: str,
+        limit: int = 10,
+        user_lat: Optional[float] = None,
+        user_lon: Optional[float] = None,
+        radius_km: Optional[float] = None,
+    ) -> Optional[list]:
+        """
+        음식점 이름으로 검색
+
+        Args:
+            query: 검색어 (최소 2자)
+            limit: 반환할 최대 결과 수
+            user_lat: 사용자 위도 (거리 계산용)
+            user_lon: 사용자 경도 (거리 계산용)
+            radius_km: 검색 반경 (km)
+
+        Returns:
+            검색 결과 리스트 또는 None
+        """
+        try:
+            params = {
+                "query": query,
+                "limit": limit,
+            }
+
+            if user_lat is not None:
+                params["user_lat"] = user_lat
+            if user_lon is not None:
+                params["user_lon"] = user_lon
+            if radius_km is not None:
+                params["radius_km"] = radius_km
+
+            result = await self._make_request(
+                "GET", "/kakao/diners/search", params=params
+            )
+            return result if result else []
+
+        except Exception as e:
+            logger.error(f"음식점 검색 중 예외 발생: {e}")
             return None
 
     async def get_category_statistics(
@@ -463,22 +511,20 @@ class YamYamOpsClient:
             카테고리 통계 리스트 또는 None
         """
         try:
-            params = {}
+            params = {"category_type": category_type}
             if category_type == "large":
-                endpoint = "/kakao/diners/categories/large"
+                endpoint = "/kakao/diners/categories"
             elif category_type == "middle":
                 if not parent_category:
                     logger.error("중분류 조회 시 parent_category 필수")
                     return None
-                endpoint = "/kakao/diners/categories/middle"
+                endpoint = "/kakao/diners/categories"
                 params["large_category"] = parent_category
             else:
                 logger.error(f"잘못된 category_type: {category_type}")
                 return None
 
-            result = await self._make_request(
-                "GET", endpoint, params=params if params else None
-            )
+            result = await self._make_request("GET", endpoint, params=params)
             return result if result else []
 
         except Exception as e:
@@ -559,9 +605,9 @@ def get_yamyam_ops_client() -> Optional[YamYamOpsClient]:
     """yamyam-ops API 클라이언트 싱글톤 인스턴스 가져오기"""
     try:
         # secrets에서 API URL 가져오기
-        api_url = st.secrets.get("YAMYAM_OPS_API_URL")
+        api_url = st.secrets.get("API_URL")
         if not api_url:
-            logger.warning("YAMYAM_OPS_API_URL이 설정되지 않았습니다.")
+            logger.warning("API_URL이 설정되지 않았습니다.")
             return None
 
         return YamYamOpsClient(api_url)

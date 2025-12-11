@@ -32,7 +32,7 @@ GOOGLE_ANALYTIC_ID = st.secrets["GOOGLE_ANALYTIC_ID"]
 MICROSOFT_CLARITY_ID = st.secrets["MICROSOFT_CLARITY_ID"]
 
 # yamyam-ops API URL
-YAMYAM_OPS_API_URL = st.secrets.get("YAMYAM_OPS_API_URL", "http://localhost:8000")
+API_URL = st.secrets.get("API_URL", "http://localhost:8000")
 
 # 우선순위를 정의
 PRIORITY_ORDER = {"한식": 1, "중식": 2, "일식": 2, "양식": 2}

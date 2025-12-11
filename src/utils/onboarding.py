@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 from firebase_admin import firestore
 
+from utils.api import APIRequester
 from utils.api_client import get_yamyam_ops_client
 from utils.auth import get_current_user
 from utils.firebase_logger import get_firebase_logger
@@ -20,6 +21,12 @@ class OnboardingManager:
     def __init__(self, app=None):
         self.logger = get_firebase_logger()
         self.app = app  # 레거시 호환성
+        # 유사 식당 fetcher 초기화
+        if app and hasattr(app, "df_diner"):
+            self.similar_fetcher = SimilarRestaurantFetcher()
+        else:
+            self.similar_fetcher = None
+        self.api_requester = APIRequester(endpoint=st.secrets["API_URL"])
 
     def _convert_api_response_to_restaurant(
         self, row: dict[str, Any]
@@ -170,10 +177,10 @@ class OnboardingManager:
 
     def get_similar_restaurants(
         self, restaurant_id: str, limit: int = 3, use_item_cf: bool = True
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         유사 음식점 조회
-        
+
         Args:
             restaurant_id: 기준 식당 ID
             limit: 반환할 최대 개수
@@ -181,13 +188,13 @@ class OnboardingManager:
         """
         if not self.similar_fetcher:
             return []
-        
+
         return self.similar_fetcher.get_similar_restaurants(
             diner_idx=int(restaurant_id),
             user_lat=st.session_state.get("user_lat"),
             user_lon=st.session_state.get("user_lon"),
             use_item_cf=use_item_cf,
-            limit=limit
+            limit=limit,
         )
 
     def save_user_profile(

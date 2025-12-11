@@ -1,14 +1,15 @@
 # pages/onboarding.py
 
-import pandas as pd
+import asyncio
+
 import streamlit as st
 
 from utils.api import APIRequester
+from utils.api_client import get_yamyam_ops_client
 from utils.auth import get_current_user
 from utils.category_manager import get_category_manager
 from utils.firebase_logger import get_firebase_logger
 from utils.onboarding import get_onboarding_manager
-from utils.search_engine import DinerSearchEngine
 
 
 class OnboardingPage:
@@ -31,10 +32,6 @@ class OnboardingPage:
 
         if "restaurant_ratings" not in st.session_state:
             st.session_state.restaurant_ratings = {}
-
-        # 검색 엔진 초기화
-        if "search_engine" not in st.session_state:
-            st.session_state.search_engine = None
 
     def _handle_feedback(self, rating_key, feedback_value, current_rating=0):
         """
@@ -63,34 +60,11 @@ class OnboardingPage:
             return True
         return False
 
-    def _initialize_search_engine(self):
-        """검색 엔진을 초기화합니다. (API 기반으로 변경됨, 레거시 호환성 유지)"""
-        if st.session_state.search_engine is None:
-            try:
-                # 검색 엔진은 이제 API 기반으로 동작하므로 빈 DataFrame으로 초기화
-                import pandas as pd
-
-                # 최소한의 구조만 유지 (실제 데이터는 API에서 가져옴)
-                basic_df = pd.DataFrame(columns=["diner_idx", "diner_name", "distance"])
-
-                search_engine = DinerSearchEngine()
-                search_engine.load_basic_data(basic_df)
-                st.session_state.search_engine = search_engine
-                return True
-            except Exception as e:
-                st.error(f"❌ 검색 엔진 초기화 실패: {str(e)}")
-                return False
-        return True
 
     @st.dialog("🔍 음식점 검색")
     def search_restaurant_dialog(self):
         """음식점 검색 다이얼로그"""
         st.subheader("🔍 음식점 검색")
-
-        # 검색 엔진 초기화
-        if not self._initialize_search_engine():
-            st.error("검색 엔진을 초기화할 수 없습니다.")
-            return
 
         # 검색 입력
         query = st.text_input(
@@ -102,47 +76,63 @@ class OnboardingPage:
 
         # 검색 결과 표시
         if query and len(query) >= 2:
-            results = st.session_state.search_engine.search(
-                query=query,
-                top_k=10,
-                jamo_threshold=0.9,
-                jamo_candidate_threshold=0.7,
-            )
+            # API 클라이언트를 사용하여 검색
+            client = get_yamyam_ops_client()
+            if not client:
+                st.error("❌ API 클라이언트를 초기화할 수 없습니다.")
+                return
 
-            # 매칭 타입에 따라 다른 정렬 기준 적용
-            if not results.empty:
-                if "jamo_score" in results.columns:
-                    # 자모 매칭의 경우 점수 순으로 정렬
-                    if "자모 매칭" in results["match_type"].values:
-                        results.sort_values(
-                            by="jamo_score", ascending=False, inplace=True
+            # 사용자 위치 정보 가져오기
+            user_lat = st.session_state.get("user_lat")
+            user_lon = st.session_state.get("user_lon")
+            radius_km = None  # 검색 반경은 제한하지 않음 (전체 검색)
+
+            # 비동기 함수를 동기적으로 실행
+            with st.spinner("🔍 검색 중..."):
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    results = loop.run_until_complete(
+                        client.search_restaurants(
+                            query=query,
+                            limit=10,
+                            user_lat=user_lat,
+                            user_lon=user_lon,
+                            radius_km=radius_km,
                         )
-                    # 정확한 매칭이나 부분 매칭의 경우 거리 순으로 정렬 (거리 정보가 있는 경우)
-                    elif "distance" in results.columns:
-                        results.sort_values(by="distance", ascending=True, inplace=True)
+                    )
+                    loop.close()
+                except Exception as e:
+                    st.error(f"❌ 검색 중 오류가 발생했습니다: {str(e)}")
+                    return
 
-            if results.empty:
+            if not results:
                 st.warning("검색 결과가 없습니다.")
             else:
                 st.success(f"✅ 검색 완료! {len(results)}개 결과를 찾았습니다.")
 
                 # 검색 결과 표시 및 평가
-                for i, (_, row) in enumerate(results.iterrows(), 1):
-                    with st.expander(f"🍽️ {i}. {row['name']} ({row['match_type']})"):
+                for i, result in enumerate(results, 1):
+                    diner_name = result.get("diner_name", "")
+                    diner_idx = result.get("diner_idx", "")
+                    match_type = result.get("match_type", "")
+                    distance = result.get("distance")
+
+                    with st.expander(f"🍽️ {i}. {diner_name} ({match_type})"):
                         st.markdown(
-                            f"**📍 [카카오맵에서 보기](https://place.map.kakao.com/{row['idx']})**"
+                            f"**📍 [카카오맵에서 보기](https://place.map.kakao.com/{diner_idx})**"
                         )
-                        st.markdown(f"**매칭 타입:** {row['match_type']}")
+                        st.markdown(f"**매칭 타입:** {match_type}")
 
                         # 거리 정보 표시 (있는 경우)
-                        if "distance" in row and pd.notna(row["distance"]):
-                            st.markdown(f"**🚶‍♂️ 거리:** {row['distance']:.1f}km")
+                        if distance is not None:
+                            st.markdown(f"**🚶‍♂️ 거리:** {distance:.1f}km")
 
                         # 평가 섹션
                         st.markdown("---")
                         st.markdown("**⭐ 평가하기**")
                         # 평가 키 생성
-                        rating_key = f"rating_search_{row['idx']}"
+                        rating_key = f"rating_search_{diner_idx}"
                         current_rating = st.session_state.restaurant_ratings.get(
                             rating_key, 0
                         )
@@ -156,7 +146,7 @@ class OnboardingPage:
                         # st.feedback 사용 (수정 가능)
                         feedback = st.feedback(
                             options="stars",
-                            key=f"feedback_search_{row['idx']}_{i}",
+                            key=f"feedback_search_{diner_idx}_{i}",
                         )
 
                         # 피드백 처리 (helper 메서드 사용)
@@ -316,6 +306,10 @@ class OnboardingPage:
         disabled_label=None,
     ):
         """네비게이션 버튼 렌더링 helper 함수"""
+        # 디버깅 로그
+        current_step = st.session_state.get("onboarding_step", 0)
+        st.write(f"🔍 [DEBUG] Navigation: current_step={current_step}, prev_step={prev_step}, next_step={next_step}, next_condition={next_condition}")
+        
         col1, col2 = st.columns([1, 1])
         with col1:
             if st.button("◀ 이전", use_container_width=True):
@@ -326,12 +320,14 @@ class OnboardingPage:
                     if "restaurants_offset" in st.session_state:
                         del st.session_state.restaurants_offset
 
+                st.write(f"🔍 [DEBUG] 이전 버튼 클릭: {current_step} → {prev_step}")
                 st.session_state.onboarding_step = prev_step
                 st.rerun()
 
         with col2:
             if next_condition:
                 if st.button(next_label, use_container_width=True, type="primary"):
+                    st.write(f"🔍 [DEBUG] 다음 버튼 클릭: {current_step} → {next_step}")
                     st.session_state.onboarding_step = next_step
                     st.rerun()
             else:
@@ -343,6 +339,10 @@ class OnboardingPage:
         st.set_page_config(
             page_title="What2Eat - 초기 설정", page_icon="🍽️", layout="wide"
         )
+
+        # 디버깅 로그
+        current_step = st.session_state.get("onboarding_step", 0)
+        st.write(f"🔍 [DEBUG] render() 호출: onboarding_step={current_step}")
 
         # 진행 상태 표시
         self._render_progress_bar()
@@ -356,7 +356,6 @@ class OnboardingPage:
             self._render_simplified_preferences_step()
         elif st.session_state.onboarding_step == 3:
             self._render_restaurant_rating_step()
-        elif st.session_state.onboarding_step == 4:
         elif st.session_state.onboarding_step == 4:
             self._render_completion_step()
 
@@ -514,6 +513,9 @@ class OnboardingPage:
 
     def _render_simplified_preferences_step(self):
         """간소화된 선호 카테고리 단계"""
+        # 디버깅 로그
+        st.write(f"🔍 [DEBUG] _render_simplified_preferences_step() 시작: onboarding_step={st.session_state.get('onboarding_step', 0)}")
+        
         st.markdown("# 🍽️ 어떤 음식을 좋아하시나요?")
 
         st.markdown("""
@@ -569,8 +571,11 @@ class OnboardingPage:
         if "food_preferences_middle" not in st.session_state.user_profile:
             st.session_state.user_profile["food_preferences_middle"] = {}
 
+        # 디버깅 로그
+        st.write(f"🔍 [DEBUG] _render_simplified_preferences_step() 종료 전: onboarding_step={st.session_state.get('onboarding_step', 0)}")
+
         # 다음 단계 버튼
-        self._render_navigation_buttons(1, 2)
+        self._render_navigation_buttons(1, 3)
 
     def _render_taste_preferences_step(self):
         """취향 정보 수집 단계"""
@@ -967,10 +972,8 @@ class OnboardingPage:
 
         # 다음 단계 버튼
         self._render_navigation_buttons(
-            2,
-            4,
-            2,
-            4,
+            prev_step=2,
+            next_step=4,
             next_condition=st.session_state.total_rated_count
             >= self.min_ratings_required,
             next_label="완료 ▶",
@@ -983,6 +986,7 @@ class OnboardingPage:
             "liked_diner_ids": [int(diner_id.split("_")[-1]) for diner_id in st.session_state.restaurant_ratings.keys()],
             "scores_of_liked_diner_ids": [score for score in st.session_state.restaurant_ratings.values()],
         }
+
         response = self.api_requester.post(
             api_path="/rec/user/similar",
             data=request_body,
