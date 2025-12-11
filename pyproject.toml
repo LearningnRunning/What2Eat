@@ -52,7 +52,6 @@ dependencies = [
     "watchdog>=6.0.0",
     "ruff==0.9.9",
     "google-generativeai==0.8.5",
-]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
